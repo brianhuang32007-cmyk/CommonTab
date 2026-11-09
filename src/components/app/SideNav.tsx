@@ -6,6 +6,7 @@ import Avatar from "@/components/Avatar";
 import { signOut } from "@/app/(app)/actions";
 import { LogOutIcon } from "./icons";
 import { MENU, PREFERENCES } from "./nav";
+import { PaymentLogo, type PaymentProvider } from "./PaymentLogos";
 import { useProfile } from "./ProfileContext";
 
 // Sidebar contents: menu, preferences, payment handles and profile card.
@@ -23,11 +24,12 @@ export default function SideNav({ onNavigate }: { onNavigate?: () => void }) {
   const zellePretty = profile.zelle?.startsWith("+1")
     ? `(${profile.zelle.slice(2, 5)}) ${profile.zelle.slice(5, 8)}-${profile.zelle.slice(8)}`
     : profile.zelle;
-  const handles = [
-    { label: "Venmo", value: profile.venmo ? `@${profile.venmo}` : null, dot: "bg-leaf" },
-    { label: "PayPal", value: profile.paypal ? `paypal.me/${profile.paypal}` : null, dot: "bg-[#E3B341]" },
-    { label: "Zelle", value: zellePretty, dot: "bg-sage" },
-  ].filter((h) => h.value);
+  const handles: { provider: PaymentProvider; label: string; value: string | null }[] = [
+    { provider: "venmo", label: "Venmo", value: profile.venmo ? `@${profile.venmo}` : null },
+    { provider: "paypal", label: "PayPal", value: profile.paypal ? `paypal.me/${profile.paypal}` : null },
+    { provider: "zelle", label: "Zelle", value: zellePretty },
+  ];
+  const anyHandle = handles.some((h) => h.value);
 
   return (
     <div className="flex h-full flex-col gap-6">
@@ -84,23 +86,31 @@ export default function SideNav({ onNavigate }: { onNavigate?: () => void }) {
         <section aria-label="Your payment handles" className="rounded-2xl border border-line bg-mist p-3.5">
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">Payment handles</p>
-            <Link href="/settings" onClick={onNavigate} className="text-xs font-bold text-brand hover:underline">
-              {handles.length ? "Edit" : "Add"}
-            </Link>
+            {anyHandle && (
+              <Link href="/settings" onClick={onNavigate} className="text-xs font-bold text-brand hover:underline">
+                Edit
+              </Link>
+            )}
           </div>
-          {handles.length ? (
-            <ul className="mt-2.5 flex flex-col gap-2 text-[13px]">
-              {handles.map((h) => (
-                <li key={h.label} className="flex items-center gap-2">
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${h.dot}`} aria-hidden="true" />
-                  <span className="w-[52px] shrink-0 font-bold text-ink">{h.label}</span>
+          <ul className="mt-2.5 flex flex-col gap-2 text-[13px]">
+            {handles.map((h) => (
+              <li key={h.provider} className="flex items-center gap-2.5">
+                <PaymentLogo provider={h.provider} className="h-7 w-7" />
+                <span className="w-[48px] shrink-0 font-bold text-ink">{h.label}</span>
+                {h.value ? (
                   <span className="min-w-0 truncate text-[#3E4A43]">{h.value}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-[13px] text-muted">Add Venmo, PayPal or Zelle so friends can pay you.</p>
-          )}
+                ) : (
+                  <Link
+                    href="/settings"
+                    onClick={onNavigate}
+                    className="font-semibold text-brand underline underline-offset-2 hover:text-brand-hover"
+                  >
+                    Add handle
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
         </section>
 
         <Link
