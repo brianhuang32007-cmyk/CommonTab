@@ -52,7 +52,47 @@ Check exact model names and free-tier limits in Google AI Studio. Keep model nam
 - **Supabase database changes** live in `supabase/migrations/*.sql`. There's no Supabase CLI: Brian runs each new file once, in order, in the Supabase **SQL Editor**. Never edit a file that has already been run; add a new one.
 - **Auth redirects:** Google and email links return to `/auth/callback?next=…`. Supabase **URL Configuration** must allow `http://localhost:3000/**` and `https://common-tab.vercel.app/**`.
 - **Next.js 16 specifics:** request guards live in `src/proxy.ts` (the new name for `middleware.ts`). `cacheComponents` is on, so pages that read the login cookie need `export const instant = false`. Check `node_modules/next/dist/docs/` before using a Next API you're unsure of. `next dev` regenerates `AGENTS.md`; keep it committed.
-- **Brand:** logo files in `public/brand/` (wordmark converted to outlines), tab icon `src/app/icon.svg`, font Plus Jakarta Sans. Colors are defined in `src/app/globals.css` (brand `#2E6A45`, sage `#8DBF9A`, ink `#17221B`, mist `#F6F7F3`, night `#14231A`). The logo design canvas: https://claude.ai/artifact/N2ADi6QhKUZupPT6iSVQcK
+- **Brand:** logo files in `public/brand/` (wordmark converted to outlines), tab icon `src/app/icon.svg`, font Plus Jakarta Sans. The logo design canvas: https://claude.ai/artifact/N2ADi6QhKUZupPT6iSVQcK
+
+## Design system
+
+Every page uses the same look. Approved dashboard design (desktop + phone): https://claude.ai/artifact/NTZEaRiQRt7dCMyTiXZkcu. Match it when building new pages.
+
+**Colors: green, yellow and white. Flat colors only, no gradients.** The tokens live in `src/app/globals.css`; use the Tailwind names (`bg-tint`, `text-honey`…), not raw hex values.
+
+| Token | Hex | Use for |
+|---|---|---|
+| `brand` | `#2E6A45` | Main buttons, links, "you're owed" amounts, active icons, logo |
+| `brand-hover` | `#25593A` | Hover on brand buttons |
+| `leaf` | `#5FA474` | Progress bars |
+| `sage` | `#8DBF9A` | Logo, small dots and accents |
+| `tint` | `#E8F2E4` | Pale green panels: greeting card, active menu item, AI panel header, "document requested" |
+| `citron` | `#F3F6E2` | Pale lime panels: "confirm your share" |
+| `butter` | `#FCF2D4` | Overdue / needs-action panels |
+| `butter-strong` | `#FBF0C9` | Yellow badges and icon chips ("NEW", chat count, lightning icon) |
+| `cream` | `#F6F3E1` | Profile card, soft highlights |
+| `honey` | `#8A5A06` | Text on yellow: overdue, disputed |
+| `ink` | `#17221B` | Main text, and "you owe" amounts |
+| `muted` | `#5B6660` | Secondary text and labels |
+| `line` | `#DDE2DA` | Borders |
+| `mist` | `#F7F8F2` | Page background |
+| white | `#FFFFFF` | Cards, sidebar, inputs |
+| `night` | `#14231A` | Landing page footer only |
+| `warn` | `#B42318` | **Form error messages only** |
+
+Rules:
+- **No red** for money states. "You owe" is dark `ink` text; overdue and disputed are `honey` text on `butter`. Red (`warn`) is only for form errors.
+- **No gradients.** The one exception is the landing hero, where the photo fades into the page.
+- Keep text contrast readable (at least 4.5:1). Pale backgrounds always get dark text.
+- No emoji in the UI; use stroke icons (24px viewBox, 2px stroke, `currentColor`).
+
+**Type and shapes:** Plus Jakarta Sans. Page titles 28–32px ExtraBold (800); card titles 18–20px ExtraBold; body 14–16px; small labels 11–12px Bold, uppercase with wide letter spacing. Cards are white with a 1px `line` border and 20–24px corners; buttons and inputs are 44–52px tall with 10–14px corners; badges and chips are fully rounded. Touch targets at least 44px.
+
+**Layout and names:**
+- **Desktop:** left sidebar with the logo; **Menu** (Dashboard, Group, Contacts, CommonTab AI, Documents & Receipts) and **Preferences** (Settings); payment handles box and profile card at the bottom. Top bar: page title on the left, a large live clock with the date in the center, the main action on the right (on the dashboard: **Add Contact**).
+- **Phone:** top bar with logo mark, title, action icon and profile photo (opens Profile & Settings); bottom tabs Home, Group, Contacts, AI, Docs.
+- **CommonTab AI** always uses the lightning-bolt icon and can be collapsed to an "Ask CommonTab AI" button. It drafts and suggests; the user taps to send.
+- Button labels use Title Case for main actions: **Add Contact**, **Create Group**.
 
 ---
 
@@ -62,12 +102,14 @@ Check exact model names and free-tier limits in Google AI Studio. Keep model nam
 
 | Tab | What it shows |
 |---|---|
-| **Dashboard** | What you owe, what you're owed, overdue items, group progress |
-| **Chats** | Group chats and direct messages, where requests get tagged |
+| **Dashboard** | What you owe, what you're owed, overdue items, what needs your attention, your groups, recent activity |
+| **Group** | Group chats and direct messages, where requests get tagged |
 | **Contacts** | Friends list, adding friends by username |
-| **Agent** | The CommonTab AI chatbot |
-| **Documents** | The AI drafting tool (see section 7) |
+| **CommonTab AI** | The AI chatbot (lightning icon) |
+| **Documents & Receipts** | The AI drafting tool (see section 7) |
 | **Profile & Settings** | Profile, payment handles and preferences. On phones, open it from the profile photo in the top corner. |
+
+Tab names follow the approved dashboard design (they used to be Chats, Agent and Documents). The planning doc still uses the old names.
 
 ## 1. Accounts, profile and settings
 - Sign up and log in with Supabase: **Google**, or **email and password** (8+ characters, email must be confirmed). Log in page has **Forgot password?** → email link → **Reset password**.
@@ -184,7 +226,7 @@ Each step is something we build together, review, then commit.
 
 ## Current step
 
-Steps 1 and 2 are done and live (last update: 2026-11-09). The dashboard is an empty page with a top bar (logo, @username, photo, Log out).
+Steps 1 and 2 are done and live (last update: 2026-11-09). The app frame is also built: every signed-in page shares `src/app/(app)/layout.tsx` (sidebar, top bar with live clock, phone drop-down menu). The dashboard shows the approved design with empty data; Group, Contacts, CommonTab AI, Documents & Receipts and Settings are "Coming soon" placeholders.
 
 **Next: Step 3, Profile & Settings.** Wait for Brian's instructions before starting.
 

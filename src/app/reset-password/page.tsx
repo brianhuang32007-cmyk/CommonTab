@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import AuthCard from "@/components/AuthCard";
 import { createClient } from "@/lib/supabase/server";
 import ResetPasswordForm from "./ResetPasswordForm";
@@ -9,6 +10,8 @@ export const instant = false;
 
 export default async function ResetPasswordPage() {
   // The reset link signs the person in (via /auth/callback) before landing here.
+  // Render per request: the login check below reads the current time (token expiry).
+  await connection();
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const email = data?.claims?.email;

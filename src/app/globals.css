@@ -1,16 +1,27 @@
 @import "tailwindcss";
 
-/* CommonTab brand colors (from the approved logo design) */
+/* CommonTab colors: green, yellow and white, flat (no gradients). See CLAUDE.md → Design system. */
 @theme inline {
-  --color-brand: #2e6a45;
+  /* Greens */
+  --color-brand: #2e6a45; /* buttons, links, "you're owed", logo */
   --color-brand-hover: #25593a;
-  --color-sage: #8dbf9a;
+  --color-leaf: #5fa474; /* progress bars */
+  --color-sage: #8dbf9a; /* logo, small accents */
   --color-mint: #cde7d3;
-  --color-ink: #17221b;
-  --color-muted: #5b6660;
-  --color-line: #dde2da;
-  --color-mist: #f6f7f3;
-  --color-night: #14231a;
+  --color-tint: #e8f2e4; /* pale green panels, active menu item */
+  --color-citron: #f3f6e2; /* pale lime panels */
+  /* Yellows */
+  --color-butter: #fcf2d4; /* overdue / needs-action panels */
+  --color-butter-strong: #fbf0c9; /* yellow badges and icon chips */
+  --color-cream: #f6f3e1; /* profile card, soft highlights */
+  --color-honey: #8a5a06; /* text on yellow: overdue, disputed */
+  /* Neutrals */
+  --color-ink: #17221b; /* main text, "you owe" amounts */
+  --color-muted: #5b6660; /* secondary text */
+  --color-line: #dde2da; /* borders */
+  --color-mist: #f7f8f2; /* page background */
+  --color-night: #14231a; /* footer */
+  /* Form errors only */
   --color-warn: #b42318;
   --font-sans: var(--font-jakarta);
 }

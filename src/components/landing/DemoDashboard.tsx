@@ -25,9 +25,9 @@ export default function DemoDashboard() {
           <dt className="text-xs font-semibold text-muted">You&apos;re owed</dt>
           <dd className="mt-1 text-lg font-extrabold text-brand sm:text-xl">$340.00</dd>
         </div>
-        <div className="rounded-2xl bg-red-50 p-3 sm:p-4">
-          <dt className="text-xs font-semibold text-warn">Overdue</dt>
-          <dd className="mt-1 text-lg font-extrabold text-warn sm:text-xl">1</dd>
+        <div className="rounded-2xl bg-butter p-3 sm:p-4">
+          <dt className="text-xs font-semibold text-honey">Overdue</dt>
+          <dd className="mt-1 text-lg font-extrabold text-honey sm:text-xl">1</dd>
         </div>
       </dl>
 
@@ -43,7 +43,7 @@ export default function DemoDashboard() {
                 </div>
                 <span
                   className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    r.overdue ? "bg-red-50 text-warn" : "bg-mist text-muted"
+                    r.overdue ? "bg-butter text-honey" : "bg-mist text-muted"
                   }`}
                 >
                   {r.note}
@@ -58,7 +58,7 @@ export default function DemoDashboard() {
                   aria-valuemax={r.total}
                   aria-label={`${r.title}: ${r.settled} of ${r.total} settled`}
                 >
-                  <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
+                  <div className="h-full rounded-full bg-leaf" style={{ width: `${pct}%` }} />
                 </div>
                 <span className="shrink-0 text-sm font-semibold text-ink">
                   {r.settled}/{r.total} settled

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import Logo from "@/components/Logo";
 import { createClient } from "@/lib/supabase/server";
 import ProfileForm from "./ProfileForm";
@@ -8,6 +9,8 @@ export const metadata = { title: "Create your profile · CommonTab" };
 export const instant = false;
 
 export default async function OnboardingPage() {
+  // Render per request: the login check below reads the current time (token expiry).
+  await connection();
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const claims = data?.claims;

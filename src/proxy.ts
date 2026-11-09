@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Runs before every page: keeps the login session fresh and guards pages.
-const SIGNED_IN_ONLY = ["/onboarding", "/dashboard"];
+const SIGNED_IN_ONLY = ["/onboarding", "/dashboard", "/group", "/contacts", "/ai", "/documents", "/settings"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

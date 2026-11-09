@@ -6,7 +6,7 @@ const statusStyle: Record<Status, string> = {
   "Marked paid": "bg-mint text-ink",
   Confirmed: "bg-mist text-brand ring-1 ring-brand/30",
   Pending: "bg-mist text-muted ring-1 ring-line",
-  Disputed: "bg-red-50 text-warn ring-1 ring-red-200",
+  Disputed: "bg-butter text-honey ring-1 ring-honey/20",
 };
 
 const shares: { name: string; status: Status }[] = [
