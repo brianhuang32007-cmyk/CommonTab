@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="CommonTab">
+<title>CommonTab</title>
+<defs>
+<clipPath id="mtop"><rect x="46" y="28" width="28" height="32"/></clipPath>
+<clipPath id="mbot"><rect x="46" y="60" width="28" height="32"/></clipPath>
+</defs>
+<g transform="rotate(-45 60 60)" fill="none">
+<mask id="mmA" maskUnits="userSpaceOnUse" x="-40" y="-40" width="200" height="200">
+<rect x="-40" y="-40" width="200" height="200" fill="#fff"/>
+<rect x="54" y="38" width="56" height="44" rx="22" stroke="#000" stroke-width="13" clip-path="url(#mtop)"/>
+</mask>
+<mask id="mmB" maskUnits="userSpaceOnUse" x="-40" y="-40" width="200" height="200">
+<rect x="-40" y="-40" width="200" height="200" fill="#fff"/>
+<rect x="10" y="38" width="56" height="44" rx="22" stroke="#000" stroke-width="13" clip-path="url(#mbot)"/>
+</mask>
+<rect x="10" y="38" width="56" height="44" rx="22" stroke="#8DBF9A" stroke-width="11" mask="url(#mmA)"/>
+<rect x="54" y="38" width="56" height="44" rx="22" stroke="#2E6A45" stroke-width="11" mask="url(#mmB)"/>
+</g>
+</svg>

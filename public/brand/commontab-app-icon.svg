@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="CommonTab">
+<title>CommonTab</title>
+<rect width="512" height="512" rx="120" fill="#2E6A45"/>
+<svg x="68" y="68" width="376" height="376" viewBox="0 0 120 120">
+<defs>
+<clipPath id="itop"><rect x="46" y="28" width="28" height="32"/></clipPath>
+<clipPath id="ibot"><rect x="46" y="60" width="28" height="32"/></clipPath>
+</defs>
+<g transform="rotate(-45 60 60)" fill="none">
+<mask id="imA" maskUnits="userSpaceOnUse" x="-40" y="-40" width="200" height="200">
+<rect x="-40" y="-40" width="200" height="200" fill="#fff"/>
+<rect x="54" y="38" width="56" height="44" rx="22" stroke="#000" stroke-width="13" clip-path="url(#itop)"/>
+</mask>
+<mask id="imB" maskUnits="userSpaceOnUse" x="-40" y="-40" width="200" height="200">
+<rect x="-40" y="-40" width="200" height="200" fill="#fff"/>
+<rect x="10" y="38" width="56" height="44" rx="22" stroke="#000" stroke-width="13" clip-path="url(#ibot)"/>
+</mask>
+<rect x="10" y="38" width="56" height="44" rx="22" stroke="#A9D4B4" stroke-width="10" mask="url(#imA)"/>
+<rect x="54" y="38" width="56" height="44" rx="22" stroke="#FFFFFF" stroke-width="10" mask="url(#imB)"/>
+</g>
+</svg>
+</svg>

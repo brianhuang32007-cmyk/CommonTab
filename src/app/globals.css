@@ -1,26 +1,22 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* CommonTab brand colors (from the approved logo design) */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-brand: #2e6a45;
+  --color-brand-hover: #25593a;
+  --color-sage: #8dbf9a;
+  --color-mint: #cde7d3;
+  --color-ink: #17221b;
+  --color-muted: #5b6660;
+  --color-line: #dde2da;
+  --color-mist: #f6f7f3;
+  --color-night: #14231a;
+  --color-warn: #b42318;
+  --font-sans: var(--font-jakarta);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background: var(--color-mist);
+  color: var(--color-ink);
+  font-family: var(--font-jakarta), Arial, Helvetica, sans-serif;
 }
