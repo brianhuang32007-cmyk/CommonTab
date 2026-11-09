@@ -127,12 +127,6 @@ export default function Home() {
         <div className="mx-auto flex max-w-6xl flex-col items-center px-4 py-16 text-center sm:px-6">
           <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Start your first shared tab</h2>
           <p className="mt-3 text-white/80">Free for clubs, trips and roommates.</p>
-          <a
-            href="#signup"
-            className="mt-8 rounded-xl bg-white px-6 py-3 font-semibold text-night transition hover:bg-mint"
-          >
-            Sign up for free
-          </a>
         </div>
         <div className="border-t border-white/10">
           <div className="mx-auto flex max-w-6xl justify-center px-4 py-6 sm:justify-start sm:px-6">

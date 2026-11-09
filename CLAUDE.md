@@ -44,6 +44,16 @@ Brian's planning doc is the Google Doc titled **"CommonTab"** (ID `15eORCYKhQXNj
 
 Check exact model names and free-tier limits in Google AI Studio. Keep model names in environment variables, not code.
 
+**AI is on hold until Step 13.** Google now issues Gemini "auth keys" (`AQ.…`, bound to a service account). Our test key mostly failed with empty 404s and `ACCESS_TOKEN_TYPE_UNSUPPORTED`, so no AI code exists yet. When we resume, the easiest option is Vercel AI Gateway (no Google key needed); Brian decides. `.env.local` already has `AI_MODEL_DEFAULT=gemini-3.5-flash-lite` and `AI_MODEL_FALLBACK=gemini-3.8-flash`.
+
+## Project facts
+
+- **Live site:** https://common-tab.vercel.app (Vercel project `common-tab`). Every push to `main` deploys automatically. The Supabase env vars are set for **Production only**, so preview deployments can't sign in yet.
+- **Supabase database changes** live in `supabase/migrations/*.sql`. There's no Supabase CLI: Brian runs each new file once, in order, in the Supabase **SQL Editor**. Never edit a file that has already been run; add a new one.
+- **Auth redirects:** Google and email links return to `/auth/callback?next=…`. Supabase **URL Configuration** must allow `http://localhost:3000/**` and `https://common-tab.vercel.app/**`.
+- **Next.js 16 specifics:** request guards live in `src/proxy.ts` (the new name for `middleware.ts`). `cacheComponents` is on, so pages that read the login cookie need `export const instant = false`. Check `node_modules/next/dist/docs/` before using a Next API you're unsure of. `next dev` regenerates `AGENTS.md`; keep it committed.
+- **Brand:** logo files in `public/brand/` (wordmark converted to outlines), tab icon `src/app/icon.svg`, font Plus Jakarta Sans. Colors are defined in `src/app/globals.css` (brand `#2E6A45`, sage `#8DBF9A`, ink `#17221B`, mist `#F6F7F3`, night `#14231A`). The logo design canvas: https://claude.ai/artifact/N2ADi6QhKUZupPT6iSVQcK
+
 ---
 
 # MVP workflow
@@ -60,9 +70,11 @@ Check exact model names and free-tier limits in Google AI Studio. Keep model nam
 | **Profile & Settings** | Profile, payment handles and preferences. On phones, open it from the profile photo in the top corner. |
 
 ## 1. Accounts, profile and settings
-- Sign up and log in with Supabase (email magic link and/or Google).
-- Each user has a unique username, which the friend system needs.
-- Profile: name, photo, username, and payment handles for Venmo, PayPal and Zelle, plus which one to show first.
+- Sign up and log in with Supabase: **Google**, or **email and password** (8+ characters, email must be confirmed). Log in page has **Forgot password?** → email link → **Reset password**.
+- After signing up, everyone must **create their profile** before reaching the dashboard:
+  - Required: **username** (unique, 3–20 lowercase letters, numbers or `_`, checked live), **first name**, **last name**, **birthday** (13 or older; private).
+  - Optional: **phone number** (US), **profile photo** (JPG/PNG/WebP up to 2 MB; default is a green person icon), and **payment handles** for Venmo, PayPal and Zelle (any, all or none).
+- Still to build in Profile & Settings: editing the profile, and which payment handle to show first.
 - Settings:
   - Reminder preferences (3 days before, 1 day before, when overdue, or off)
   - Privacy (kept simple in the MVP)
@@ -151,9 +163,9 @@ Each step is something we build together, review, then commit.
 
 | Phase | Step | What we build |
 |---|---|---|
-| 0. Setup | 1 | Next.js + Supabase + Vercel project, `.gitignore`, environment variables, deployed placeholder page |
-| 1. Foundation | 2 | Login with Supabase |
-| | 3 | Profile & Settings: username, photo, payment handles, reminder preferences, log out |
+| 0. Setup | 1 | Next.js + Supabase + Vercel project, `.gitignore`, environment variables, deployed placeholder page **(done)** |
+| 1. Foundation | 2 | Landing page, sign-up (Google, email + password), create profile, log in, forgot/reset password **(done)** |
+| | 3 | Profile & Settings: edit profile, photo and payment handles, reminder preferences, log out |
 | | 4 | Navigation bar with the tabs (placeholder pages) |
 | 2. Social | 5 | Contacts: add friends by username, friends list |
 | | 6 | Groups: create a group, invite friends, roles |
@@ -172,8 +184,11 @@ Each step is something we build together, review, then commit.
 
 ## Current step
 
-**Step 1: project setup.** Not started yet.
+Steps 1 and 2 are done and live (last update: 2026-11-09). The dashboard is an empty page with a top bar (logo, @username, photo, Log out).
+
+**Next: Step 3, Profile & Settings.** Wait for Brian's instructions before starting.
 
 Open questions:
+- CLAUDE.md and the planning doc disagree in places (5 vs 6 tabs, Settings, Steps 13/15, whose Zelle handle the button shows). Brian hasn't said which is current; the Google Doc also still says "magic link".
 - Can any member create payment requests, or only organizers?
 - What's the scope of "AI helps fill out documents," and is it in the MVP?
