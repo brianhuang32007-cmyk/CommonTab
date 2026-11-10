@@ -148,29 +148,42 @@ Tab names follow the approved dashboard design (they used to be Chats, Agent and
 ## 4. Payment requests (tagged)
 - Create one from a chat: two buttons sit just above the message box, **Request Payment** and **Request Document** (decided 2026-11-10).
 - **Only the group's owner and organizers can request a payment** (Request Payment is hidden for members, and the database enforces it). **Anyone in the group can request a document.**
-- Each button opens a **separate page with a form**. For now the form has **only the request's title**; Brian will specify the other fields later (decided 2026-11-10).
-- Fields: title, purpose, total, due date, receipt (photo or PDF), and tagged people.
+- Each button opens a **separate page with a form** (decided 2026-11-10). The **Request Payment** form has: title, total (fills itself in from custom amounts if left empty), due date, receipt, **add people** (the group's members, always shown, each with an Add button, plus Select All), an **"Include myself in the payment"** checkbox (you can't add yourself otherwise; your own share counts as paid), and the split. The **Request Document** form still has only the title (not saved yet).
 - **Each payment request and each document request has its own separate page with its own link** (decided 2026-11-10). The chat card's Details button, the group's Requests tab, alerts and the Dashboard all open that page.
-- **After it's made, a payment request goes public in the chat** as a card and appears in each tagged person's Requests list (decided 2026-11-10). The card shows the **due date**, the **total**, and **what the person viewing it owes**, with two buttons side by side: **Details** (a page with the payment's details) and **Settle** (a page for settling it). Both pages stay empty for now. **Only the people tagged to pay see both buttons; the sender and anyone not tagged see Details only** (decided 2026-11-10).
+- **After it's made, a payment request goes public in the chat** as a card and appears in each tagged person's Requests list (decided 2026-11-10). The card shows a chip saying where you stand (You requested / You're paying / Not in this request), the **total**, the **due date**, a **Digital receipt available** label when there is one, a progress bar ("1 of 4 settled"), and **Details** plus the payer's next step. The requester or the group owner can delete it with the × (confirm first). Cards update live when any share changes.
+  - **The requester** sees how much they're still owed and **each person's status** (Pending, Confirmed, Paid, plus Disputed or Waived). Everyone else sees who has paid and who hasn't.
+  - **People paying** see their share with its status, and one button: **Confirm** (Pending) → **Settle** (Confirmed), or **In Dispute**. **The sender and anyone not tagged see Details only.**
+  - If the requester includes themselves, their own share is already Paid, so progress starts at "1 of N settled".
+- **Details page** (`/group/<chat>/payments/<request>`): header (title, total, Open or **Fully paid**, due date, who requested it), "your part" (the requester: still owed and collected; payers: share, status, Confirm / Settle / Dispute; others: not in it), the dispute list, **Who owes you** / **Who's in it** (each person's amount and status), **How you get paid** (requester: their own handles) or **Pay to** (payers: the requester's handles with Copy) or **Paid to** (others), the payment records, the receipt (digital receipt and original photo) and **Activity** (requested, confirmed, disputed, amount changed, waived, dispute canceled, paid). Everyone in the group sees each person's amount and status; dispute details and payment records are private (see section 5).
 - **Requests and documents lists** are a clear record of every current request the user **sent and/or received**: each row shows what it is, who it's from or to, the amount or document, its status and its deadline, and opens that request's page. **Sorted by the most urgent deadline first** (overdue, then due soonest, then no deadline) (decided 2026-11-10).
 - Split options:
   - **Equal:** $100 over 5 people is $20 each. When it doesn't divide evenly, extra cents go to the first people ($100 / 3 = $33.34, $33.33, $33.33).
-  - **Custom:** set an amount per person.
+  - **Custom:** set an amount per person, **by amount or by percentage** (percentages are rounded down, leftover cents go to the first people).
   - **AI scan:** attach a receipt or bill. AI reads the total and splits it evenly among the tagged people.
 - **Receipt** (decided 2026-11-10): two options, **Attach a Photo** (from the device) or **Take a Photo** (opens the camera). The AI scans it and turns it into a **clear digital receipt** with the key information (vendor, date, items, subtotal, tax, tip, total). The requester checks and can correct it before sending; the original photo stays attached. Private to the group, like chat files. The AI reads and drafts only; plain code does any math.
-- The request shows who gets paid, with their handles.
-- Pay buttons:
-  - **Venmo:** opens the Venmo app with the amount and note filled in
-  - **PayPal:** opens PayPal.me with the amount filled in
-  - **Zelle:** shows the payee's Zelle email or phone with a copy button. Zelle can't be linked to directly.
+- The request shows who gets paid (always the requester), with their handles.
+- Payment requests are only made in groups for now (hidden in DMs).
 
 ## 5. Confirmation, disputes and settlement (inside requests)
-- Each tagged person **confirms** their share or **disputes** it with a short reason.
-- A dispute opens a **dispute thread** where the people involved negotiate. When they agree, the amount is edited and the person re-confirms.
-- Settlement:
-  - The member taps **I paid** and attaches proof (a screenshot or reference number).
-  - The organizer approves or rejects it.
-- Share status: `Pending → Confirmed → Marked paid → Settled`, or `Disputed` (back to Pending once resolved).
+Share status: `Pending → Confirmed → Paid`, with `Disputed` and `Waived` as side paths. (`Paid` is stored as `settled`; `Marked paid` exists in the database but isn't used.)
+
+**Confirm:** each person paying confirms their share before they can pay (Confirm on the card, the Details page or the Settle page).
+
+**Disputes** (Step 10, built 2026-11-10):
+- **Dispute** opens a small form: the current share, a short reason (500 characters max), **Cancel** or **Submit Dispute**. Only Pending or Confirmed shares can be disputed; one open dispute per share. If submitting fails, the reason stays filled in. An earlier confirmation stays in the history, but the person confirms again before paying.
+- **Each dispute has its own page** (`/group/<chat>/payments/<request>/disputes/<dispute>`), opened with **Open Dispute Chat** from the Details page (the dispute list, the disputed person's row, or the payer's part). Desktop: **chat on the left**, **negotiation tool on the right**. Phone: negotiation on top, chat below (no tabs).
+  - **Chat:** the reason pinned on top, messages with times, live. Every proposal and decision is a bold, highlighted line with a label: **Proposed** (white, green border), **Countered** (lime), **Accepted** (pale green), **Declined** (yellow, never red), **Dispute canceled** (grey).
+  - **Negotiation:** the current proposal with **Accept** / **Counter** (and **Keep Original Amount** for the requester); **Propose a new share** (either side); **Propose Canceling My Payment** (the disputer only); **Cancel Dispute** (the disputer only); **History** of every proposal and how it ended; **Outcome** once resolved.
+- Rules: one open proposal at a time (a newer one replaces yours or counters theirs; old ones stay in history). Amounts are positive whole cents. **Accept** a new amount → the share changes and goes back to Pending (confirm again). **Accept** a cancel → the share is **Waived** (owes nothing; leaves progress and "still owed"). **Keep Original Amount** → the share stays Disputed. **Cancel Dispute** (the person who started it) → the share keeps its amount and goes back to Pending.
+- **Private:** only the requester and the disputing person see the reason, chat and proposals. The group sees only the status and Activity lines (no reasons).
+- Not built: files in the dispute chat; alerts for disputes. The request total doesn't change when a share changes or is waived.
+
+**Settle: simulated payments** (Step 11, built 2026-11-10; Brian's call). **No real money moves and no outside app opens; every payment is accepted.** CommonTab still holds no balances or wallets; a payment is only a record of who paid whom.
+- Settle page (`…/settle`), confirmed shares only: **1. Choose a payment method**: only methods **already on the payer's account** (Venmo / PayPal / Zelle, and that the requester takes if they've added any; the requester's preferred first). With none, it links to Preferences to add a handle. → **2. Review and authorize** (amount, recipient's handle, your handle, an editable note) → **Confirm Demo Payment** → **3. Processing** (a progress bar with random pauses, 3 to 7 seconds) → **Payment Complete** with a receipt (amount, method, recipient, transaction ID `CT-…`, time).
+- The share becomes **Paid** right away (no approval). One payment per share; app-made ids stop double payments. When every share is Paid or Waived, the request is **Fully paid** and leaves the open Requests lists.
+- The requester sees **Payments Received** on the Details page (person, amount, method, transaction ID, time); the payer sees **Your Payment**. Nobody else sees payment records. The note and the payer's handle aren't saved yet (receipt only).
+- **Local demo:** `http://localhost:3000/demo/settle` walks through the payer's screens with made-up people and no sign-in, next to what the requester sees (statuses, still owed, progress, reminders), with **Reset Demo**. It only exists under `npm run dev` (not found on the live site) and never touches the database.
+- Real in-app payments aren't possible with Venmo, PayPal or Zelle (no public payment APIs), and Stripe lists peer-to-peer money transmission as restricted, so real payments stay after the MVP.
 
 ## 6. Document requests and AI check (inside requests)
 - In a chat, anyone can use **Request Document** and tag someone ("@Alex I need the receipt for gas"). Choose a document type and an optional deadline.
@@ -211,7 +224,7 @@ Tab names follow the approved dashboard design (they used to be Chats, Agent and
 - Receipt images are resized before they're sent.
 
 ## After the MVP
-- Stripe Connect in-app payments (test mode first) with automatic settlement
+- Real in-app payments (replacing the simulation). Stripe restricts peer-to-peer money transmission, so this needs a provider built for it (or Stripe's approval) first
 - Email and push notifications
 - Refunds and reimbursement flows
 - Multiple currencies
@@ -231,10 +244,10 @@ Each step is something we build together, review, then commit.
 | 2. Social | 5 | Contacts: add friends by username, friends list **(built; live test pending)** |
 | | 6 | Groups: create a group, invite friends, roles **(done)** |
 | | 7 | Real-time chat and direct messages **(done)** |
-| | 8 | @tagging in chat **(@mentions done; tagging requests comes with Steps 9 and 12)** |
-| 3. Money | 9 | Payment requests with equal and custom splits **(current)** |
-| | 10 | Confirm, dispute and dispute threads |
-| | 11 | Pay buttons (Venmo, PayPal, Zelle) and settlement with proof |
+| | 8 | @tagging in chat **(done: @mentions, and payment requests tag everyone paying; document requests come with Step 12)** |
+| 3. Money | 9 | Payment requests with equal and custom splits **(done)** |
+| | 10 | Confirm, dispute and dispute threads **(done)** |
+| | 11 | Settlement **(done as simulated in-app payments; no real money)** |
 | 4. Documents | 12 | Document requests and uploads |
 | | 13 | AI receipt tools inside requests: scan and split, AI check on uploads |
 | 5. Dashboard | 14 | Dashboard: owe/owed/overdue and progress bars |
@@ -245,7 +258,7 @@ Each step is something we build together, review, then commit.
 
 ## Current step
 
-Last update: 2026-11-10. Steps 1 to 3, 5 to 7 and the first part of Step 16 are done and live (Step 4 is covered by the app frame in `src/app/(app)/layout.tsx`). Contacts still needs a live test with two accounts.
+Last update: 2026-11-10. Steps 1 to 3, 5 to 7, 9 to 11 and the first part of Step 16 are done and live (Step 4 is covered by the app frame in `src/app/(app)/layout.tsx`). Contacts still needs a live test with two accounts.
 
 **Done: Steps 6 and 7, Groups and chats** (migrations `20261110030000` to `20261110090000` have all been run). Code is in `src/app/(app)/group/`. Groups with owner, organizer and member roles; a Details window (members, roles, Invite Contacts with search, Edit Group, Delete Group, Make Owner); DMs; chat with date lines, older messages on scroll, live updates, attachments (JPG, PNG, WebP or PDF, up to 5 at 10 MB each, private to members) and @mentions; an "@ You" badge on chats with unread mentions; new messages in the alert bell; and the unread count on the Group tab. Group pictures and chat files are private and open through short-lived links (`src/lib/signedLinks.ts`). Every write goes through checked database functions, and app-made ids stop duplicates on retry.
 
@@ -260,17 +273,26 @@ Known gaps from Steps 6 and 7:
 - Limits: 30 questions per person in any 24 hours, every call logged in `ai_calls` (including which model answered).
 - When requests exist, give the AI read-only tools for them (what you owe, who still owes, due dates) and use the answer cards in `src/app/(app)/ai/blocks.tsx` (payment summary, document request).
 
-**Dashboard** now matches the Group page: real groups (unread counts, "@ You"), Recent activity (chats with new messages) and Needs your attention (mentions). The money cards (You owe, You're owed, Overdue, Settled) are still $0 placeholders and get real numbers in Step 9.
+**Dashboard** matches the Group page: real groups (unread counts, "@ You"), Recent activity (chats with new messages) and Needs your attention (mentions). The money cards (You owe, You're owed, Overdue, Settled) are still $0 placeholders; they get real numbers in Step 14.
 
-**Current: Step 9, payment requests with equal and custom splits** (Brian's call, 2026-11-10), then Steps 10 to 12. Build one piece at a time and plan each piece with Brian before writing code. See section 4 above for the spec. What's already in place:
-- Requests are created from a chat. The chat already has @mentions stored by user id, which is how people get tagged in a request.
-- The Conversation view has a **Requests** tab (empty placeholder) next to Chat and Files, and the chat side panel has a "Needs your attention" card.
-- Payment handles (Venmo, PayPal, Zelle, plus which to show first) are already stored on each profile and shown in DMs.
-- Receipts can reuse the private `chat-files` storage pattern (members only, short-lived links).
-- Rules that apply: amounts in whole cents and all math in plain code (equal split: extra cents to the first people); money states never use red ("you owe" is ink, overdue and disputed are honey on butter); every write goes through checked database functions with app-made ids so retries can't duplicate; CommonTab never holds money.
+**Done: Steps 9 to 11, payment requests, disputes and simulated payments** (2026-11-10; migrations `20261110110000` to `20261110170000` have all been run; all live). See sections 4 and 5 for how they work. Code:
+- `src/app/(app)/group/requests.ts`: types and the plain-code money helpers (`splitEvenly`, `splitByPercent`, `parseCents`, `dueLabel`, the page links, `SHARE_STATUS`).
+- `src/app/(app)/group/[chatId]/request/[kind]/`: the Request Payment / Request Document forms (`PaymentForm.tsx`, receipt scan through `/api/ai/receipt`).
+- `src/app/(app)/group/MessageList.tsx` (`RequestCard`), `RequestsTab.tsx`, and `messages.ts` (`refreshRequest`: cards update when a share changes).
+- `src/app/(app)/group/[chatId]/payments/[requestId]/`: `RequestDetails.tsx`, `DisputePanel.tsx` (dispute list and `useMyDisputes`), `dispute/` (start-a-dispute form), `disputes/[disputeId]/DisputeRoom.tsx` (the dispute page), `settle/` (`SettlePanel.tsx` is the shared payment UI; `SettleView.tsx` connects it to the database).
+- `src/app/demo/settle/`: the local no-sign-in demo.
+
+Still to test with a second account (e.g. @briantest): paying a share end to end, and cancelling a dispute. A full negotiation (propose, decline, counter, accept) has been tested.
+
+**Next:** Brian's call. Remaining: Step 12 (document requests), 13 (AI check on uploads), 14 (Dashboard money numbers), 15 (Documents tab), the rest of 16 (AI tools for requests: what you owe, who still owes; answer cards in `src/app/(app)/ai/blocks.tsx`), 17 (reminders). Build one piece at a time and plan each piece with Brian before writing code.
+
+Rules that still apply: amounts in whole cents and all math in plain code; money states never use red ("you owe" is ink, overdue and disputed are honey on butter); every write goes through checked database functions with app-made ids so retries can't duplicate; CommonTab never holds money.
 
 Open questions:
 - AI bot: should conversations be saved to the database (so they survive a reload and sync across devices)?
 - Groups: what happens when the owner deletes their account?
-- Payment requests: in a DM there are no organizers, so can either person request a payment there? Who gets paid (always the creator, or can they pick someone)? Can a request be edited or cancelled after it's sent, and by whom? Must every tagged person be a group member, and can the creator include themselves in the split?
+- Payment requests: can either person request a payment in a DM (hidden there for now)? Can a request be edited after it's sent? Should the request total change when a dispute changes or waives a share?
+- Disputes: files in the dispute chat, and alerts for disputes and payments?
+- Payments: save the payment note and the payer's handle so the requester sees them?
+- Request Document: its fields (title only so far, not saved).
 - What's the scope of "AI helps fill out documents," and is it in the MVP?

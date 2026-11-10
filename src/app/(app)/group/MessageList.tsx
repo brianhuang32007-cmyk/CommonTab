@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
 import { CardIcon, CloseIcon, FileIcon, ReceiptIcon } from "@/components/app/icons";
+import { paymentRef } from "@/lib/alerts";
 import { signedLinks } from "@/lib/signedLinks";
 import type { createClient } from "@/lib/supabase/client";
 import { fileSize, type Attachment, type DraftFile, type MessagesState, type Outgoing } from "./messages";
@@ -559,6 +560,7 @@ function RequestCard({
 
       <div className="px-4 pt-3">
         <p className="text-lg leading-6 font-extrabold break-words">{request.title}</p>
+        <p className="font-mono text-[11px] font-bold text-muted">{paymentRef(request.id)}</p>
         <p className="mt-0.5 flex items-center gap-2 font-extrabold">
           {dollars(request.total_cents)} total
           {request.status === "settled" && (

@@ -1,12 +1,17 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ContactRow } from "@/app/(app)/contacts/types";
+import type { PaymentRequestRow } from "@/app/(app)/group/requests";
+import { allAlerts, alertIsUnread, type AlertItem, type RequestEvent } from "@/lib/alerts";
+import { loadAlertReads, markAlertRead as saveAlertRead } from "@/lib/notificationReads";
 import { groupPictureLinks } from "@/lib/groupPictures";
 import { createClient } from "@/lib/supabase/client";
 
-// Alerts for the signed-in user: new contact requests and unread chat messages.
-// One live source for the whole app frame: the bell and the sidebar badges all read it.
+// Alerts for the signed-in user, in one live source for the whole app frame: contact requests,
+// unread chats, payment reminders (shares to confirm or pay, open disputes), what happened on
+// your requests, and which alerts you've read. The bell (unread only), Alerts & Reminders
+// (everything) and the sidebar badges all read it, so their numbers always agree.
 
 /** A chat with unread messages, from my_message_alerts(). */
 export type MessageAlert = {
@@ -37,11 +42,26 @@ type Notifications = {
   messages: MessageAlert[];
   /** Unread messages across all your chats (the Group tab's number). */
   unreadMessages: number;
-  /** When you last opened the bell (ISO time), or null if never. */
+  /** When you last tapped "Mark all as read" (ISO time), or null if never. */
   seenAt: string | null;
-  /** Alerts that arrived after seenAt (the bell's number). */
+  /** Your open payment requests (the reminders come from these); null while loading. */
+  paymentRows: PaymentRequestRow[] | null;
+  /** What happened on your requests lately. */
+  events: RequestEvent[];
+  /** Your read marks: alert key → when you read it. */
+  reads: Map<string, string>;
+  /** Reminders couldn't load the first time / a later refresh failed (what's shown stays). */
+  alertsFailed: boolean;
+  alertsRefreshFailed: boolean;
+  /** Every alert, newest first, and the unread ones (what the bell shows). */
+  alerts: AlertItem[];
+  unreadAlerts: AlertItem[];
+  /** How many alerts are unread (the bell's number, and Alerts & Reminders' "All"). */
   unread: number;
-  markRead: () => Promise<void>;
+  /** Mark one alert read (e.g. its page opened). */
+  markAlertRead: (key: string) => void;
+  /** Marks everything up to now as read. False if it couldn't be saved. */
+  markRead: () => Promise<boolean>;
   accept: (userId: string) => Promise<boolean>;
   decline: (userId: string) => Promise<boolean>;
   /** Reload now (e.g. right after a chat was read). */
@@ -54,10 +74,34 @@ export function NotificationsProvider({ userId, children }: { userId: string; ch
   const [requests, setRequests] = useState<ContactRow[]>([]);
   const [messages, setMessages] = useState<MessageAlert[]>([]);
   const [seenAt, setSeenAt] = useState<string | null>(null);
+  const [paymentRows, setPaymentRows] = useState<PaymentRequestRow[] | null>(null);
+  const [events, setEvents] = useState<RequestEvent[]>([]);
+  const [reads, setReads] = useState<Map<string, string>>(new Map());
+  const [alertsFailed, setAlertsFailed] = useState(false);
+  const [alertsRefreshFailed, setAlertsRefreshFailed] = useState(false);
+  const paymentsLoaded = useRef(false);
 
   const load = useCallback(async () => {
     const supabase = createClient();
-    const [contacts, alerts] = await Promise.all([supabase.rpc("my_contacts"), supabase.rpc("my_message_alerts")]);
+    const [contacts, alerts, payments, feed, marks] = await Promise.all([
+      supabase.rpc("my_contacts"),
+      supabase.rpc("my_message_alerts"),
+      supabase.rpc("my_payment_requests"),
+      supabase.rpc("my_request_events", { max_rows: 50 }),
+      loadAlertReads(supabase),
+    ]);
+    // Payment reminders: a failed first load shows an error; a failed refresh keeps what's shown.
+    if (payments.error) {
+      if (!paymentsLoaded.current) setAlertsFailed(true);
+      else setAlertsRefreshFailed(true);
+    } else {
+      paymentsLoaded.current = true;
+      setAlertsFailed(false);
+      setAlertsRefreshFailed(false);
+      setPaymentRows((payments.data ?? []) as PaymentRequestRow[]);
+    }
+    if (!feed.error) setEvents((feed.data ?? []) as RequestEvent[]);
+    if (marks) setReads(marks);
     if (contacts.data) {
       setRequests(
         (contacts.data as ContactRow[])
@@ -95,26 +139,45 @@ export function NotificationsProvider({ userId, children }: { userId: string; ch
       clearTimeout(timer);
       timer = setTimeout(load, 150);
     };
+    // Payment shares, requests and their history change → reload. Coming back to the tab → reload.
+    const onVisible = () => document.visibilityState === "visible" && refresh();
+    document.addEventListener("visibilitychange", onVisible);
     const channel = supabase
       .channel(`notifications-${userId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "contacts" }, refresh)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "payment_shares" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "payment_requests" }, refresh)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "payment_share_events" }, refresh)
       .subscribe();
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
       supabase.removeChannel(channel);
     };
   }, [userId, load]);
 
-  const unread =
-    requests.filter((r) => isNewer(r.requested_at, seenAt)).length + messages.filter((m) => isNewer(m.created_at, seenAt)).length;
+  const alerts = useMemo(
+    () => allAlerts({ rows: paymentRows, events, contacts: requests, messages }),
+    [paymentRows, events, requests, messages],
+  );
+  const unreadAlerts = useMemo(() => alerts.filter((a) => alertIsUnread(a, seenAt, reads)), [alerts, seenAt, reads]);
+  const unread = unreadAlerts.length;
+
+  // Shows as read right away; saved in the background.
+  const markAlertRead = useCallback((key: string) => {
+    setReads((r) => new Map(r).set(key, new Date().toISOString()));
+    saveAlertRead(createClient(), key);
+  }, []);
   const unreadMessages = messages.reduce((sum, m) => sum + m.unread_count, 0);
 
   const markRead = useCallback(async () => {
     const { data, error } = await createClient().rpc("mark_notifications_read");
-    if (!error && data) setSeenAt(data as string);
+    if (error || !data) return false;
+    setSeenAt(data as string);
+    return true;
   }, []);
 
   const respond = useCallback(
@@ -138,7 +201,15 @@ export function NotificationsProvider({ userId, children }: { userId: string; ch
         messages,
         unreadMessages,
         seenAt,
+        paymentRows,
+        events,
+        reads,
+        alertsFailed,
+        alertsRefreshFailed,
+        alerts,
+        unreadAlerts,
         unread,
+        markAlertRead,
         markRead,
         accept: (id) => respond("accept_contact_request", id),
         decline: (id) => respond("remove_contact", id),

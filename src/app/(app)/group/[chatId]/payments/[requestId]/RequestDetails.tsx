@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
 import { CardIcon, CheckIcon, ChevronLeftIcon, CloseIcon, ReceiptIcon } from "@/components/app/icons";
 import { PaymentLogo, type PaymentProvider } from "@/components/app/PaymentLogos";
 import { useProfile } from "@/components/app/ProfileContext";
 import { formatUsPhone } from "@/lib/profile";
+import { useNotifications } from "@/components/app/NotificationsContext";
+import { paymentRef } from "@/lib/alerts";
+import { alertKey } from "@/lib/notificationReads";
 import { signedLinks } from "@/lib/signedLinks";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -37,10 +40,12 @@ const HANDLE_LABEL: Record<PaymentProvider, string> = { venmo: "Venmo", paypal: 
 export default function RequestDetails() {
   const { chatId, requestId } = useParams<{ chatId: string; requestId: string }>();
   const { id: me } = useProfile();
+  const { markAlertRead } = useNotifications();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [state, setState] = useState<State>({ status: "loading" });
   const [photo, setPhoto] = useState<string | null>(null);
+  const markedRead = useRef(false);
   const { disputes } = useMyDisputes(requestId);
 
   const load = useCallback(async () => {
@@ -49,11 +54,16 @@ export default function RequestDetails() {
     if (!data) return setState({ status: "missing" });
     const request = data as PaymentRequestDetails;
     setState({ status: "ready", request });
+    // Opened successfully: this request's reminder counts as read (the task stays until done).
+    if (!markedRead.current) {
+      markedRead.current = true;
+      markAlertRead(alertKey.payment(requestId));
+    }
     if (request.receipt_path) {
       const links = await signedLinks(supabase, "chat-files", [request.receipt_path]);
       setPhoto(links.get(request.receipt_path) ?? null);
     }
-  }, [supabase, requestId]);
+  }, [supabase, requestId, markAlertRead]);
 
   // Live: shares change as people settle (later steps), or the request is deleted.
   useEffect(() => {
@@ -152,6 +162,7 @@ export default function RequestDetails() {
                 <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${chip.className}`}>{chip.text}</span>
               </div>
               <h2 className="mt-2 text-[26px] leading-tight font-extrabold tracking-tight break-words">{r.title}</h2>
+              <PaymentId id={r.id} />
               <p className="mt-1 text-2xl font-extrabold">{dollars(r.total_cents)} total</p>
               <p className="mt-1 text-sm text-muted">
                 <span className={due.overdue ? "rounded-full bg-butter px-2 py-0.5 font-bold text-honey" : ""}>{due.text}</span> · Requested
@@ -653,5 +664,27 @@ function DeleteButton({ requestId, onDeleted }: { requestId: string; onDeleted: 
         </button>
       </div>
     </div>
+  );
+}
+
+/** The request's short payment ID (PR-…), with Copy. Search it on Alerts & Reminders → Payments. */
+function PaymentId({ id }: { id: string }) {
+  const [copied, setCopied] = useState(false);
+  const ref = paymentRef(id);
+  return (
+    <p className="mt-1 flex items-center gap-2 text-sm text-muted">
+      Payment ID <span className="font-mono font-bold text-ink">{ref}</span>
+      <button
+        type="button"
+        onClick={async () => {
+          await navigator.clipboard.writeText(ref).catch(() => {});
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        }}
+        className="h-8 rounded-lg border border-line bg-white px-2.5 text-xs font-bold text-ink hover:bg-mist"
+      >
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </p>
   );
 }

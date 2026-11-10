@@ -30,6 +30,10 @@ export type PaymentRequestRow = PaymentRequestView & {
   direction: "sent" | "received";
   conversation_name: string | null;
   conversation_kind: "group" | "dm";
+  /** When it was requested, and by whom (missing before migration 20261110180000). */
+  created_at?: string;
+  requester_first_name?: string | null;
+  requester_last_name?: string | null;
 };
 
 /** The AI's digital receipt, as the requester checked it. */
@@ -116,6 +120,21 @@ export function dueLabel(due: string | null): { text: string; overdue: boolean }
   if (due < today) return { text: `Overdue · ${pretty}`, overdue: true };
   if (due === today) return { text: "Due today", overdue: false };
   return { text: `Due ${pretty}`, overdue: false };
+}
+
+/** Reminder deadlines: "2 days overdue", "Due today", "Due tomorrow", "Due Nov 13", or "No due date",
+ *  with a tone for the color (overdue, soon = today or tomorrow, later, none). Uses your time zone. */
+export function deadlineLabel(due: string | null): { text: string; tone: "overdue" | "soon" | "later" | "none" } {
+  if (!due) return { text: "No due date", tone: "none" };
+  const days = Math.round((localDay(due).getTime() - localDay(todayIso()).getTime()) / 86_400_000);
+  if (days < 0) return { text: `${-days} ${days === -1 ? "day" : "days"} overdue`, tone: "overdue" };
+  if (days === 0) return { text: "Due today", tone: "soon" };
+  if (days === 1) return { text: "Due tomorrow", tone: "soon" };
+  const sameYear = localDay(due).getFullYear() === new Date().getFullYear();
+  return {
+    text: `Due ${localDay(due).toLocaleDateString("en-US", { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) })}`,
+    tone: "later",
+  };
 }
 
 export const detailsHref = (chatId: string, requestId: string) => `/group/${chatId}/payments/${requestId}`;
