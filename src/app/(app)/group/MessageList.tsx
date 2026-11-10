@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
-import { CardIcon, CloseIcon, FileIcon } from "@/components/app/icons";
+import { CardIcon, CloseIcon, FileIcon, ReceiptIcon } from "@/components/app/icons";
 import { signedLinks } from "@/lib/signedLinks";
 import type { createClient } from "@/lib/supabase/client";
 import { fileSize, type Attachment, type DraftFile, type MessagesState, type Outgoing } from "./messages";
@@ -531,6 +531,12 @@ function RequestCard({
           <span className={due.overdue ? "rounded-full bg-butter px-1.5 py-0.5 font-bold text-honey" : ""}>{due.text}</span> · Requested by{" "}
           {iAmPayee ? "you" : firstName(request.created_by)}
         </p>
+        {request.has_receipt && (
+          <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-tint px-2.5 py-1 text-xs font-bold text-brand">
+            <ReceiptIcon className="h-3.5 w-3.5" />
+            Digital receipt available
+          </span>
+        )}
       </div>
 
       <div className="mx-4 mt-3 border-t border-line pt-3">

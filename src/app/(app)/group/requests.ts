@@ -19,6 +19,8 @@ export type PaymentRequestView = {
   settled_count: number;
   /** What's still unpaid across everyone. */
   outstanding_cents: number;
+  /** A digital receipt is attached (missing before migration 20261110140000). */
+  has_receipt?: boolean;
   /** Everyone in the split and where they are (missing before migration 20261110120000). */
   shares?: { user_id: string; amount_cents: number; status: PaymentRequestView["my_share_status"] }[];
 };
@@ -118,3 +120,45 @@ export function dueLabel(due: string | null): { text: string; overdue: boolean }
 
 export const detailsHref = (chatId: string, requestId: string) => `/group/${chatId}/payments/${requestId}`;
 export const settleHref = (chatId: string, requestId: string) => `/group/${chatId}/payments/${requestId}/settle`;
+
+/** Everything the Details page shows (payment_request_details). */
+export type PaymentRequestDetails = PaymentRequestView & {
+  split: "equal" | "custom";
+  created_at: string;
+  receipt: DigitalReceipt | null;
+  receipt_path: string | null;
+  conversation_name: string | null;
+  conversation_kind: "group" | "dm";
+  my_role: "owner" | "organizer" | "member" | null;
+  creator: { user_id: string; first_name: string; last_name: string } | null;
+  payee: {
+    user_id: string;
+    first_name: string;
+    last_name: string;
+    username: string;
+    avatar_url: string | null;
+    venmo_username: string | null;
+    paypal_username: string | null;
+    zelle_contact: string | null;
+    preferred_handle: "venmo" | "paypal" | "zelle" | null;
+  } | null;
+  people: {
+    user_id: string;
+    first_name: string;
+    last_name: string;
+    username: string;
+    avatar_url: string | null;
+    amount_cents: number;
+    status: NonNullable<PaymentRequestView["my_share_status"]>;
+    updated_at: string;
+  }[];
+};
+
+export const SHARE_STATUS: Record<NonNullable<PaymentRequestView["my_share_status"]>, { label: string; className: string }> = {
+  pending: { label: "Pending", className: "bg-mist text-muted" },
+  confirmed: { label: "Confirmed", className: "bg-tint text-brand" },
+  marked_paid: { label: "Marked paid", className: "bg-tint text-brand" },
+  settled: { label: "Settled", className: "bg-brand text-white" },
+  // No red for money states: yellow with dark text.
+  disputed: { label: "Disputed", className: "bg-butter text-honey" },
+};
