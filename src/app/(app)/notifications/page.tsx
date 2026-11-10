@@ -1,9 +1,8 @@
-import EmptyPage from "@/components/app/EmptyPage";
+import AlertsView from "./AlertsView";
 
 export const metadata = { title: "Alerts & Reminders · CommonTab" };
 
+// /notifications: Alerts & Reminders (tasks that need you, and recent updates).
 export default function Page() {
-  return (
-    <EmptyPage text="All your alerts in one place, like new contact requests, plus reminders before payments are due." />
-  );
+  return <AlertsView />;
 }
