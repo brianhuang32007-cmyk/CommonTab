@@ -6,7 +6,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeftIcon } from "@/components/app/icons";
 import { useProfile } from "@/components/app/ProfileContext";
 import { createClient } from "@/lib/supabase/client";
-import { detailsHref, dollars, SHARE_STATUS, type PaymentRequestDetails } from "../../../../requests";
+import { detailsHref, disputeRoomHref, dollars, SHARE_STATUS, type PaymentRequestDetails } from "../../../../requests";
+import { disputeFor, useMyDisputes } from "../DisputePanel";
 
 // Starting a dispute: shows your current share, asks for a short reason, then Cancel or
 // Submit Dispute. Only a Pending or Confirmed share can be disputed, one open dispute at a
@@ -26,6 +27,8 @@ export default function DisputeForm() {
   const [problem, setProblem] = useState<string | null>(null);
   const disputeId = useRef<string | null>(null);
   const details = detailsHref(chatId, requestId);
+  const { disputes } = useMyDisputes(requestId);
+  const openDispute = disputeFor(disputes, me);
 
   useEffect(() => {
     let live = true;
@@ -50,7 +53,7 @@ export default function DisputeForm() {
       setBusy(false);
       return setProblem(`${error.message.replace(/\.$/, "")}. Your reason is still here; try again.`);
     }
-    router.push(`${details}#dispute`);
+    router.push(disputeRoomHref(chatId, requestId, disputeId.current));
   }
 
   const shell = (body: React.ReactNode) => (
@@ -89,7 +92,7 @@ export default function DisputeForm() {
       <>
         <p className="font-bold">You already have an open dispute on this share.</p>
         <Link
-          href={`${details}#dispute`}
+          href={openDispute ? disputeRoomHref(chatId, requestId, openDispute.id) : details}
           className="mt-3 inline-flex h-11 items-center rounded-xl bg-brand px-4 text-sm font-bold text-white hover:bg-brand-hover"
         >
           Open Dispute Chat

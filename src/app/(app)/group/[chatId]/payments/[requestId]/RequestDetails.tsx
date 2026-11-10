@@ -12,6 +12,7 @@ import { signedLinks } from "@/lib/signedLinks";
 import { createClient } from "@/lib/supabase/client";
 import {
   disputeHref,
+  disputeRoomHref,
   dollars,
   dueLabel,
   localDay,
@@ -20,7 +21,7 @@ import {
   type PaymentRequestDetails,
   type ShareEvent,
 } from "../../../requests";
-import DisputePanel, { type ChatFocus } from "./DisputePanel";
+import DisputePanel, { disputeFor, useMyDisputes } from "./DisputePanel";
 
 // A payment request's Details page. It adapts to who's looking: the requester sees what
 // they're still owed, people paying see their share and Settle, everyone else sees that
@@ -38,8 +39,7 @@ export default function RequestDetails() {
   const supabase = useMemo(() => createClient(), []);
   const [state, setState] = useState<State>({ status: "loading" });
   const [photo, setPhoto] = useState<string | null>(null);
-  const [chatFocus, setChatFocus] = useState<ChatFocus | null>(null);
-  const openChat = (user: string | null) => setChatFocus((f) => ({ user, n: (f?.n ?? 0) + 1 }));
+  const { disputes } = useMyDisputes(requestId);
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.rpc("payment_request_details", { req: requestId });
@@ -112,6 +112,11 @@ export default function RequestDetails() {
   const allSettled = counted.length > 0 && settled.length === counted.length;
   const requester = r.creator ? (r.creator.user_id === me ? "you" : r.creator.first_name) : "a former member";
   const created = new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  // Each dispute has its own page: the member's open one (else their latest).
+  const chatHref = (member: string) => {
+    const d = disputeFor(disputes, member);
+    return d ? disputeRoomHref(r.conversation_id, r.id, d.id) : null;
+  };
   const stillOwing = counted.filter((p) => p.status !== "settled" && p.user_id !== r.payee_id).length;
 
   const chip = iAmPayee
@@ -185,7 +190,7 @@ export default function RequestDetails() {
                   </span>
                 )}
               </div>
-              <PayerActions request={r} onChanged={load} onOpenChat={() => openChat(null)} />
+              <PayerActions request={r} onChanged={load} chatHref={chatHref(me)} />
             </div>
           ) : (
             <p className="text-sm text-muted">You&apos;re not part of this request, so there&apos;s nothing for you to pay.</p>
@@ -193,7 +198,7 @@ export default function RequestDetails() {
         </section>
 
         {/* The private dispute chat: only the requester and whoever is disputing see anything here. */}
-        {(iAmPayee || inSplit) && <DisputePanel requestId={r.id} me={me} payee={r.payee} focus={chatFocus} onChanged={load} />}
+        {(iAmPayee || inSplit) && <DisputePanel chatId={r.conversation_id} requestId={r.id} disputes={disputes} iAmRequester={iAmPayee} />}
 
         {/* 3. Who's in it */}
         <section className="rounded-3xl border border-line bg-white p-6 sm:p-7">
@@ -235,14 +240,13 @@ export default function RequestDetails() {
                     {status.label}
                   </span>
                   {/* The requester talks with each person disputing in a private chat. */}
-                  {iAmPayee && p.status === "disputed" && (
-                    <button
-                      type="button"
-                      onClick={() => openChat(p.user_id)}
-                      className="ml-12 h-11 rounded-xl bg-brand px-4 text-sm font-bold text-white hover:bg-brand-hover"
+                  {iAmPayee && p.status === "disputed" && chatHref(p.user_id) && (
+                    <Link
+                      href={chatHref(p.user_id)!}
+                      className="ml-12 flex h-11 items-center rounded-xl bg-brand px-4 text-sm font-bold text-white hover:bg-brand-hover"
                     >
                       Open Dispute Chat
-                    </button>
+                    </Link>
                   )}
                 </li>
               );
@@ -355,11 +359,11 @@ function eventText(e: ShareEvent, me: string) {
 function PayerActions({
   request: r,
   onChanged,
-  onOpenChat,
+  chatHref,
 }: {
   request: PaymentRequestDetails;
   onChanged: () => void;
-  onOpenChat: () => void;
+  chatHref: string | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [busy, setBusy] = useState(false);
@@ -410,10 +414,10 @@ function PayerActions({
     );
   } else if (status === "disputed") {
     note = `You're disputing this share. Work it out with ${payee} in the dispute chat before paying.`;
-    buttons = (
-      <button type="button" onClick={onOpenChat} className={primary}>
+    buttons = chatHref && (
+      <Link href={chatHref} className={primary}>
         Open Dispute Chat
-      </button>
+      </Link>
     );
   } else if (status === "waived") {
     note = `${payee} canceled your payment after your dispute. You don't owe anything.`;
