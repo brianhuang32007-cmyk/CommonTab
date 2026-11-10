@@ -23,7 +23,7 @@ import { DisputeStatusChip, useMyDisputes } from "../../DisputePanel";
 // One dispute's own page. Chat on the left (the reason pinned on top, messages, and short
 // notes for each proposal and decision); the negotiation tool on the right (the current
 // proposal and its answers, proposing a new share, proposing canceling, the history and
-// the outcome). On phones the two sit under Chat / Negotiate tabs.
+// the outcome). On phones the negotiation sits on top with the chat below it.
 // Only the requester and the person disputing can open it. Every change goes through the
 // database's checked functions; nothing here changes a share by itself.
 
@@ -36,7 +36,6 @@ export default function DisputeRoom() {
   const supabase = useMemo(() => createClient(), []);
   const { disputes, reload } = useMyDisputes(requestId);
   const [request, setRequest] = useState<PaymentRequestDetails | null | "error">(null);
-  const [tab, setTab] = useState<"chat" | "negotiate">("chat");
 
   // The request: its title, the requester, and the member's current share (live).
   const loadRequest = useCallback(async () => {
@@ -134,52 +133,13 @@ export default function DisputeRoom() {
         <p className="mt-3 text-[13px] text-muted">Private: only you and {other?.first_name ?? "the requester"} can see this page.</p>
       </section>
 
-      {/* Phone: Chat / Negotiate tabs */}
-      <div
-        role="tablist"
-        aria-label="Dispute"
-        className="mt-4 grid grid-cols-2 gap-1 rounded-2xl border border-line bg-white p-1 lg:hidden"
-      >
-        {(["chat", "negotiate"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
-            className={`h-11 rounded-xl text-sm font-bold ${tab === t ? "bg-tint text-brand" : "text-muted hover:bg-mist"}`}
-          >
-            {t === "chat" ? "Chat" : "Negotiate"}
-            {t === "negotiate" && open && open.author_id !== me && (
-              <span className="ml-1.5 rounded-full bg-butter-strong px-1.5 py-0.5 text-[11px] text-[#5C4A0B]">1</span>
-            )}
-          </button>
-        ))}
-      </div>
-
+      {/* Desktop: chat on the left, negotiation on the right. Phone: negotiation on top, chat below. */}
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
-        {/* Left: the chat */}
-        <section
-          className={`${tab === "chat" ? "flex" : "hidden"} min-h-[480px] flex-col rounded-3xl border border-line bg-white lg:flex lg:h-[calc(100vh-280px)]`}
-        >
-          {open && (
-            <button
-              type="button"
-              onClick={() => setTab("negotiate")}
-              className="m-3 mb-0 flex min-h-11 items-center justify-between gap-2 rounded-xl bg-butter-strong px-3 py-2 text-left text-sm lg:hidden"
-            >
-              <span>
-                <span className="font-bold">{open.author_id === me ? "You propose" : `${who(open.author_id)} proposes`}</span>{" "}
-                {proposalText(open, who(member.user_id))}
-              </span>
-              <span className="shrink-0 font-bold text-brand">{open.author_id === me ? "View" : "Answer"}</span>
-            </button>
-          )}
+        <section className="order-2 flex h-[70vh] min-h-[420px] flex-col rounded-3xl border border-line bg-white lg:order-1 lg:h-[calc(100vh-280px)] lg:min-h-[480px]">
           <ChatColumn dispute={dispute} me={me} who={who} supabase={supabase} onSent={changed} />
         </section>
 
-        {/* Right: the negotiation tool */}
-        <aside className={`${tab === "negotiate" ? "flex" : "hidden"} flex-col gap-4 lg:flex`}>
+        <aside className="order-1 flex flex-col gap-4 lg:order-2">
           <Negotiation dispute={dispute} me={me} who={who} iAmRequester={iAmRequester} open={open} onChanged={changed} />
         </aside>
       </div>
