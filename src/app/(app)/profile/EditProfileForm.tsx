@@ -157,7 +157,13 @@ export default function EditProfileForm({ initial }: { initial: ProfileValues })
     <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
       {/* Photo */}
       <div className="flex items-center gap-4">
-        <Avatar src={shownPhoto} size={80} alt={shownPhoto ? "Your profile photo" : "Default profile icon"} />
+        <Avatar
+          src={shownPhoto}
+          name={`${firstName} ${lastName}`}
+          seed={initial.userId}
+          size={80}
+          alt={shownPhoto ? "Your profile photo" : "Your initials (default photo)"}
+        />
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap gap-2">
             <label

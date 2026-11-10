@@ -153,7 +153,13 @@ export default function ProfileForm({
     <form onSubmit={submit} className="mt-6 flex flex-col gap-5" noValidate>
       {/* Photo (optional) */}
       <div className="flex items-center gap-4">
-        <Avatar src={preview} size={72} alt={preview ? "Your new profile photo" : "Default profile icon"} />
+        <Avatar
+          src={preview}
+          name={`${firstName} ${lastName}`}
+          seed={userId}
+          size={72}
+          alt={preview ? "Your new profile photo" : "Your initials (default photo)"}
+        />
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap gap-2">
             <label

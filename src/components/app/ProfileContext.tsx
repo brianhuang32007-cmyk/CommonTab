@@ -3,6 +3,7 @@
 import { createContext, useContext } from "react";
 
 export type AppProfile = {
+  id: string;
   username: string;
   firstName: string;
   lastName: string;

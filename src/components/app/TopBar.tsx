@@ -14,7 +14,7 @@ export default function TopBar() {
   const action =
     pathname === "/dashboard" ? (
       <Link
-        href="/contacts"
+        href="/contacts#add-contact"
         className="inline-flex h-12 items-center gap-2.5 rounded-[14px] bg-brand px-6 text-lg font-bold text-white transition hover:bg-brand-hover lg:h-[52px]"
       >
         <AddContactIcon className="h-[22px] w-[22px]" />

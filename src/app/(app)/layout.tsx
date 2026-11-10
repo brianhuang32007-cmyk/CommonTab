@@ -25,6 +25,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   if (!row) redirect("/onboarding");
 
   const profile: AppProfile = {
+    id: userId,
     username: row.username,
     firstName: row.first_name,
     lastName: row.last_name,

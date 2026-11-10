@@ -116,7 +116,7 @@ Tab names follow the approved dashboard design (they used to be Chats, Agent and
 - Sign up and log in with Supabase: **Google**, or **email and password** (8+ characters, email must be confirmed). Log in page has **Forgot password?** → email link → **Reset password**.
 - After signing up, everyone must **create their profile** before reaching the dashboard:
   - Required: **username** (unique, 3–20 lowercase letters, numbers or `_`, checked live), **first name**, **last name**, **birthday** (13 or older; private).
-  - Optional: **phone number** (US), **profile photo** (JPG/PNG/WebP up to 2 MB; default is a green person icon), and **payment handles** for Venmo, PayPal and Zelle (any, all or none).
+  - Optional: **phone number** (US), **profile photo** (JPG/PNG/WebP up to 2 MB; default is their initials on a soft color picked from their account), and **payment handles** for Venmo, PayPal and Zelle (any, all or none).
 - **Profile** page: edit photo, first and last name, username (live check), phone and birthday.
 - **Preferences** page (each card saves on its own):
   - Payment handles, plus **Show first**: which handle friends see first
@@ -209,9 +209,9 @@ Each step is something we build together, review, then commit.
 |---|---|---|
 | 0. Setup | 1 | Next.js + Supabase + Vercel project, `.gitignore`, environment variables, deployed placeholder page **(done)** |
 | 1. Foundation | 2 | Landing page, sign-up (Google, email + password), create profile, log in, forgot/reset password **(done)** |
-| | 3 | Preferences and Profile: edit profile, photo and payment handles, reminders, privacy, account **(built)** |
+| | 3 | Preferences and Profile: edit profile, photo and payment handles, reminders, privacy, account **(done)** |
 | | 4 | Navigation bar with the tabs (placeholder pages) |
-| 2. Social | 5 | Contacts: add friends by username, friends list |
+| 2. Social | 5 | Contacts: add friends by username, friends list **(built; live test pending)** |
 | | 6 | Groups: create a group, invite friends, roles |
 | | 7 | Real-time chat and direct messages |
 | | 8 | @tagging in chat |
@@ -228,9 +228,11 @@ Each step is something we build together, review, then commit.
 
 ## Current step
 
-Steps 1 and 2 are done and live (last update: 2026-11-09). The app frame is also built: every signed-in page shares `src/app/(app)/layout.tsx` (sidebar, top bar with live clock, phone drop-down menu). The dashboard shows the approved design with empty data; Group, Contacts, CommonTab AI and Documents & Receipts are "Coming soon" placeholders.
+Steps 1, 2 and 3 are done and live (last update: 2026-11-10). The app frame is also built: every signed-in page shares `src/app/(app)/layout.tsx` (sidebar, top bar with live clock, phone drop-down menu). The dashboard shows the approved design with empty data; Group, Contacts, CommonTab AI and Documents & Receipts are "Coming soon" placeholders.
 
-**Step 3 (Preferences and Profile) is built.** It needs `supabase/migrations/20261110000000_preferences.sql` run in Supabase. Step 4 (navigation) was covered by the app frame. **Next: Step 5, Contacts.** Wait for Brian's instructions before starting.
+**Step 3 (Preferences and Profile) is done and live.** The app frame already covers most of Step 4 (navigation).
+
+**Current: Step 5, Contacts, is built** (migration `20261110010000_contacts.sql` has been run). Username search (top 10, prefix first), requests that must be accepted, contacts list (starred first, then A to Z; 12 visible, then scroll), private stars, a profile pop-up (handles, phone if shared, groups in common once Groups exist), and live updates through Supabase Realtime, including a request badge on Contacts in the sidebar. Default profile pictures are initials on a soft color picked from the account (`src/components/Avatar.tsx`). Still to do: a live test with two accounts. Wait for Brian's instructions before starting the next step.
 
 Open questions:
 - CLAUDE.md and the planning doc disagree in places (5 vs 6 tabs, Settings, Steps 13/15, whose Zelle handle the button shows). Brian hasn't said which is current; the Google Doc also still says "magic link".

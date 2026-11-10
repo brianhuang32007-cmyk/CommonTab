@@ -9,8 +9,10 @@ import { pageTitle } from "./nav";
 import { ProfileProvider, type AppProfile } from "./ProfileContext";
 import SideNav from "./SideNav";
 import TopBar from "./TopBar";
+import { useIncomingRequests } from "./useIncomingRequests";
 
 export default function AppShell({ profile, children }: { profile: AppProfile; children: React.ReactNode }) {
+  const requestCount = useIncomingRequests(profile.id);
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => setMenuOpen(false);
@@ -31,7 +33,7 @@ export default function AppShell({ profile, children }: { profile: AppProfile; c
             />
           </Link>
           <nav aria-label="Main" className="flex grow flex-col">
-            <SideNav />
+            <SideNav requestCount={requestCount} />
           </nav>
         </aside>
 
@@ -67,7 +69,7 @@ export default function AppShell({ profile, children }: { profile: AppProfile; c
                   aria-label="Main"
                   className="absolute inset-x-0 top-full z-10 max-h-[calc(100vh-69px)] overflow-y-auto border-b border-line bg-white px-4 pb-5 pt-4 shadow-lg"
                 >
-                  <SideNav onNavigate={closeMenu} />
+                  <SideNav onNavigate={closeMenu} requestCount={requestCount} />
                 </nav>
               </>
             )}

@@ -11,7 +11,7 @@ import { useProfile } from "./ProfileContext";
 
 // Sidebar contents: menu, preferences, payment handles and profile card.
 // Shown as a fixed sidebar on desktop and as the drop-down menu on phones.
-export default function SideNav({ onNavigate }: { onNavigate?: () => void }) {
+export default function SideNav({ onNavigate, requestCount = 0 }: { onNavigate?: () => void; requestCount?: number }) {
   const pathname = usePathname();
   const profile = useProfile();
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -47,6 +47,14 @@ export default function SideNav({ onNavigate }: { onNavigate?: () => void }) {
             >
               <item.icon className={`h-5 w-5 shrink-0 ${active ? "text-brand" : "text-muted"}`} />
               <span className="grow">{item.label}</span>
+              {item.href === "/contacts" && requestCount > 0 && (
+                <span
+                  aria-label={`${requestCount} new ${requestCount === 1 ? "request" : "requests"}`}
+                  className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-brand px-1.5 text-xs font-bold text-white"
+                >
+                  {requestCount}
+                </span>
+              )}
               {"badge" in item && (
                 <span className="rounded-md bg-butter-strong px-2 py-0.5 text-[11px] font-bold tracking-wide text-[#5C4A0B]">
                   {item.badge}
@@ -118,7 +126,7 @@ export default function SideNav({ onNavigate }: { onNavigate?: () => void }) {
           onClick={onNavigate}
           className="flex items-center gap-3 rounded-2xl bg-cream p-3 text-ink transition hover:bg-butter"
         >
-          <Avatar src={profile.avatarUrl} size={44} alt="" />
+          <Avatar src={profile.avatarUrl} name={`${profile.firstName} ${profile.lastName}`} seed={profile.id} size={44} />
           <span className="flex min-w-0 flex-col">
             <span className="truncate font-bold">
               {profile.firstName} {profile.lastName}

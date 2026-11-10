@@ -54,7 +54,7 @@ export default async function PreferencesPage() {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       {/* Profile summary */}
       <section className="flex flex-wrap items-center gap-4 rounded-3xl bg-cream p-5 sm:p-6">
-        <Avatar src={p.avatar_url} size={64} alt="" />
+        <Avatar src={p.avatar_url} name={`${p.first_name} ${p.last_name}`} seed={claims.sub} size={64} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-lg font-extrabold text-ink sm:text-xl">
             {p.first_name} {p.last_name}
