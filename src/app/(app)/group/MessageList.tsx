@@ -486,13 +486,13 @@ function RequestCard({
   const iAmPayee = request.payee_id === me;
   const inSplit = request.my_share_cents !== null && !iAmPayee;
   // Tagged to pay: they can settle. The sender and everyone else see Details only.
-  const canSettle = inSplit;
+  const canSettle = inSplit && request.my_share_status !== "settled" && request.my_share_status !== "waived";
   const firstName = (id: string | null) =>
     id === me ? "you" : id ? (members.get(id)?.first_name ?? "a former member") : "a former member";
 
   // Progress counts everyone in the split. A requester who included themselves is already
   // settled, so it starts at "1 of N settled" with them under Paid.
-  const payers = request.shares ?? [];
+  const payers = (request.shares ?? []).filter((s) => s.status !== "waived"); // canceled in a dispute
   const paid = payers.filter((s) => s.status === "settled");
   const waiting = payers.filter((s) => s.status !== "settled");
   const percent = payers.length ? Math.round((paid.length / payers.length) * 100) : 0;
@@ -556,7 +556,11 @@ function RequestCard({
           <p className="flex items-baseline justify-between font-bold">
             Your share
             <span className="text-lg font-extrabold text-ink">
-              {request.my_share_status === "settled" ? "Settled" : dollars(request.my_share_cents ?? 0)}
+              {request.my_share_status === "settled"
+                ? "Settled"
+                : request.my_share_status === "waived"
+                  ? "Waived"
+                  : dollars(request.my_share_cents ?? 0)}
             </span>
           </p>
         ) : (

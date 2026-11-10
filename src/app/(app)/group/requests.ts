@@ -14,7 +14,7 @@ export type PaymentRequestView = {
   payee_id: string | null;
   /** Your share, or null if you're not in the split. */
   my_share_cents: number | null;
-  my_share_status: "pending" | "confirmed" | "marked_paid" | "settled" | "disputed" | null;
+  my_share_status: "pending" | "confirmed" | "marked_paid" | "settled" | "disputed" | "waived" | null;
   share_count: number;
   settled_count: number;
   /** What's still unpaid across everyone. */
@@ -153,6 +153,46 @@ export type PaymentRequestDetails = PaymentRequestView & {
     status: NonNullable<PaymentRequestView["my_share_status"]>;
     updated_at: string;
   }[];
+  /** What happened to each share (missing before migration 20261110150000). */
+  events?: ShareEvent[];
+};
+
+/** One line of a share's history, visible to the group (never a dispute's reason or chat). */
+export type ShareEvent = {
+  id: number;
+  user_id: string;
+  actor_id: string | null;
+  kind: "confirmed" | "disputed" | "amount_changed" | "waived";
+  amount_cents: number | null;
+  previous_cents: number | null;
+  created_at: string;
+  first_name: string;
+};
+
+/** A dispute as one of its two sides sees it (my_payment_disputes). */
+export type PaymentDispute = {
+  id: string;
+  member: { user_id: string; first_name: string; last_name: string; username: string; avatar_url: string | null };
+  reason: string;
+  original_cents: number;
+  status: "open" | "resolved";
+  resolution: "new_amount" | "waived" | null;
+  final_cents: number | null;
+  created_at: string;
+  resolved_at: string | null;
+  messages: { id: string; author_id: string | null; body: string; created_at: string }[];
+  proposals: DisputeProposal[];
+};
+
+export type DisputeProposal = {
+  id: string;
+  author_id: string | null;
+  kind: "amount" | "cancel";
+  amount_cents: number | null;
+  status: "open" | "accepted" | "countered" | "persisted" | "replaced";
+  created_at: string;
+  decided_at: string | null;
+  decided_by: string | null;
 };
 
 export const SHARE_STATUS: Record<NonNullable<PaymentRequestView["my_share_status"]>, { label: string; className: string }> = {
@@ -162,4 +202,9 @@ export const SHARE_STATUS: Record<NonNullable<PaymentRequestView["my_share_statu
   settled: { label: "Settled", className: "bg-brand text-white" },
   // No red for money states: yellow with dark text.
   disputed: { label: "Disputed", className: "bg-butter text-honey" },
+  waived: { label: "Waived", className: "bg-mist text-muted" },
 };
+
+/** "Nov 10, 3:04 PM" */
+export const stamp = (iso: string) =>
+  new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });

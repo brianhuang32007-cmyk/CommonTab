@@ -1,8 +1,8 @@
-import EmptyRequestPage from "../EmptyRequestPage";
+import DisputeForm from "./DisputeForm";
 
 export const metadata = { title: "Dispute Payment · CommonTab" };
 
-// /group/<chat id>/payments/<request id>/dispute: disputing your share (coming in Step 10).
+// /group/<chat id>/payments/<request id>/dispute: start a dispute on your share.
 export default function Page() {
-  return <EmptyRequestPage heading="Dispute Payment" text="Disputing your share of this request will happen here soon." />;
+  return <DisputeForm />;
 }

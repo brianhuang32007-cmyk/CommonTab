@@ -10,7 +10,17 @@ import { useProfile } from "@/components/app/ProfileContext";
 import { formatUsPhone } from "@/lib/profile";
 import { signedLinks } from "@/lib/signedLinks";
 import { createClient } from "@/lib/supabase/client";
-import { disputeHref, dollars, dueLabel, localDay, settleHref, SHARE_STATUS, type PaymentRequestDetails } from "../../../requests";
+import {
+  disputeHref,
+  dollars,
+  dueLabel,
+  localDay,
+  settleHref,
+  SHARE_STATUS,
+  type PaymentRequestDetails,
+  type ShareEvent,
+} from "../../../requests";
+import DisputePanel from "./DisputePanel";
 
 // A payment request's Details page. It adapts to who's looking: the requester sees what
 // they're still owed, people paying see their share and Settle, everyone else sees that
@@ -52,6 +62,7 @@ export default function RequestDetails() {
       .channel(`request-${requestId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "payment_shares" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "payment_requests" }, refresh)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "payment_share_events" }, refresh)
       .subscribe();
     return () => {
       clearTimeout(timer);
@@ -90,15 +101,16 @@ export default function RequestDetails() {
   const inSplit = r.my_share_cents !== null && !iAmPayee;
   const canDelete = r.created_by === me || r.my_role === "owner";
   const due = dueLabel(r.due_date);
-  const settled = r.people.filter((p) => p.status === "settled");
+  // A share canceled in a dispute (waived) no longer counts toward progress or what's owed.
+  const counted = r.people.filter((p) => p.status !== "waived");
+  const settled = counted.filter((p) => p.status === "settled");
   const collected = settled.reduce((a, p) => a + p.amount_cents, 0);
-  const outstanding = r.people.filter((p) => p.status !== "settled").reduce((a, p) => a + p.amount_cents, 0);
-  const percent = r.people.length ? Math.round((settled.length / r.people.length) * 100) : 0;
-  const allSettled = r.people.length > 0 && settled.length === r.people.length;
+  const outstanding = counted.filter((p) => p.status !== "settled").reduce((a, p) => a + p.amount_cents, 0);
+  const percent = counted.length ? Math.round((settled.length / counted.length) * 100) : 0;
+  const allSettled = counted.length > 0 && settled.length === counted.length;
   const requester = r.creator ? (r.creator.user_id === me ? "you" : r.creator.first_name) : "a former member";
   const created = new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  const stillOwing = r.people.filter((p) => p.status !== "settled" && p.user_id !== r.payee_id).length;
-  const canDispute = r.my_share_status === "pending" || r.my_share_status === "confirmed";
+  const stillOwing = counted.filter((p) => p.status !== "settled" && p.user_id !== r.payee_id).length;
 
   const chip = iAmPayee
     ? { text: "You requested", className: "bg-tint text-brand" }
@@ -171,29 +183,15 @@ export default function RequestDetails() {
                   </span>
                 )}
               </div>
-              {r.my_share_status !== "settled" && (
-                <div className="flex w-full gap-2 sm:w-auto">
-                  {canDispute && (
-                    <Link
-                      href={disputeHref(r.conversation_id, r.id)}
-                      className="flex h-12 flex-1 items-center justify-center rounded-xl border border-line bg-white px-6 font-bold text-ink hover:bg-mist sm:flex-none"
-                    >
-                      Dispute
-                    </Link>
-                  )}
-                  <Link
-                    href={settleHref(r.conversation_id, r.id)}
-                    className="flex h-12 flex-1 items-center justify-center rounded-xl bg-brand px-6 font-bold text-white hover:bg-brand-hover sm:flex-none"
-                  >
-                    Settle
-                  </Link>
-                </div>
-              )}
+              <PayerActions request={r} onChanged={load} />
             </div>
           ) : (
             <p className="text-sm text-muted">You&apos;re not part of this request, so there&apos;s nothing for you to pay.</p>
           )}
         </section>
+
+        {/* The private dispute chat: only the requester and whoever is disputing see anything here. */}
+        {(iAmPayee || inSplit) && <DisputePanel requestId={r.id} me={me} payee={r.payee} onChanged={load} />}
 
         {/* 3. Who's in it */}
         <section className="rounded-3xl border border-line bg-white p-6 sm:p-7">
@@ -212,7 +210,7 @@ export default function RequestDetails() {
             <div className="h-full rounded-full bg-leaf" style={{ width: `${percent}%` }} />
           </div>
           <p className="mt-1.5 text-sm text-muted">
-            {settled.length} of {r.people.length} settled
+            {settled.length} of {counted.length} settled
           </p>
           <ul className="mt-3 flex flex-col">
             {r.people.map((p) => {
@@ -298,6 +296,9 @@ export default function RequestDetails() {
               text={`${r.creator ? (r.creator.user_id === me ? "You" : r.creator.first_name) : "Someone"} requested ${dollars(r.total_cents)}`}
               when={r.created_at}
             />
+            {(r.events ?? []).map((e) => (
+              <ActivityItem key={e.id} text={eventText(e, me)} when={e.created_at} />
+            ))}
             {r.people
               .filter((p) => p.status === "settled" && p.user_id !== r.payee_id)
               .sort((a, b) => a.updated_at.localeCompare(b.updated_at))
@@ -310,8 +311,8 @@ export default function RequestDetails() {
                 />
               ))}
           </ol>
-          {settled.filter((p) => p.user_id !== r.payee_id).length === 0 && (
-            <p className="mt-3 text-sm text-muted">Payments will show here as people settle.</p>
+          {!(r.events ?? []).length && settled.filter((p) => p.user_id !== r.payee_id).length === 0 && (
+            <p className="mt-3 text-sm text-muted">Confirmations, disputes and payments will show here.</p>
           )}
         </section>
       </div>
@@ -320,6 +321,98 @@ export default function RequestDetails() {
 }
 
 /* ---------- Pieces ---------- */
+
+/** A share's history line. Never shows a dispute's reason or chat (those are private). */
+function eventText(e: ShareEvent, me: string) {
+  const you = e.user_id === me;
+  const name = you ? "You" : e.first_name;
+  const whose = you ? "Your" : `${e.first_name}'s`;
+  switch (e.kind) {
+    case "confirmed":
+      return `${name} confirmed ${you ? "your" : "their"} share of ${dollars(e.amount_cents ?? 0)}`;
+    case "disputed":
+      return `${name} disputed ${you ? "your" : "their"} share of ${dollars(e.amount_cents ?? 0)}`;
+    case "amount_changed":
+      return `${whose} share changed from ${dollars(e.previous_cents ?? 0)} to ${dollars(e.amount_cents ?? 0)} after a dispute`;
+    case "waived":
+      return `${whose} payment was canceled after a dispute`;
+  }
+}
+
+/** What someone paying can do next: confirm, then settle; dispute while Pending or Confirmed. */
+function PayerActions({ request: r, onChanged }: { request: PaymentRequestDetails; onChanged: () => void }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const status = r.my_share_status;
+  const payee = r.payee?.first_name ?? "the requester";
+
+  async function confirm() {
+    setBusy(true);
+    setProblem(null);
+    const { error } = await supabase.rpc("confirm_payment_share", { req: r.id });
+    setBusy(false);
+    if (error) setProblem(error.message);
+    else onChanged();
+  }
+
+  const dispute = (
+    <Link
+      href={disputeHref(r.conversation_id, r.id)}
+      className="flex h-12 flex-1 items-center justify-center rounded-xl border border-line bg-white px-6 font-bold text-ink hover:bg-mist sm:flex-none"
+    >
+      Dispute
+    </Link>
+  );
+  const primary =
+    "flex h-12 flex-1 items-center justify-center rounded-xl bg-brand px-6 font-bold text-white hover:bg-brand-hover disabled:opacity-60 sm:flex-none";
+
+  let note: string | null = null;
+  let buttons: React.ReactNode = null;
+  if (status === "pending") {
+    note = "Check the amount, then confirm it before paying.";
+    buttons = (
+      <>
+        {dispute}
+        <button type="button" onClick={confirm} disabled={busy} className={primary}>
+          {busy ? "Confirming…" : "Confirm"}
+        </button>
+      </>
+    );
+  } else if (status === "confirmed") {
+    buttons = (
+      <>
+        {dispute}
+        <Link href={settleHref(r.conversation_id, r.id)} className={primary}>
+          Settle
+        </Link>
+      </>
+    );
+  } else if (status === "disputed") {
+    note = `You're disputing this share. Work it out with ${payee} in the dispute chat before paying.`;
+    buttons = (
+      <a href="#dispute" className={primary}>
+        Open Dispute Chat
+      </a>
+    );
+  } else if (status === "waived") {
+    note = `${payee} canceled your payment after your dispute. You don't owe anything.`;
+  }
+
+  return (
+    <>
+      {buttons && <div className="flex w-full gap-2 sm:w-auto">{buttons}</div>}
+      {note && (
+        <p className={`w-full text-sm ${status === "disputed" ? "rounded-2xl bg-butter px-4 py-3 text-ink" : "text-muted"}`}>{note}</p>
+      )}
+      {problem && (
+        <p role="alert" className="w-full text-sm font-semibold text-warn">
+          {problem}
+        </p>
+      )}
+    </>
+  );
+}
 
 function PayeeRow({ payee }: { payee: NonNullable<PaymentRequestDetails["payee"]> }) {
   return (
