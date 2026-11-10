@@ -149,25 +149,39 @@ export default function DisputeRoom() {
 
 /* ---------- Left: the chat ---------- */
 
+type Tone = "proposed" | "countered" | "accepted" | "declined";
 type Item =
-  { at: string; kind: "message"; id: string; author: string | null; body: string } | { at: string; kind: "note"; id: string; text: string };
+  | { at: string; kind: "message"; id: string; author: string | null; body: string }
+  | { at: string; kind: "note"; id: string; tone: Tone; text: string };
 
-/** Messages, plus a short note for each proposal and decision, in time order. */
+/** How each action stands out in the chat. Declined is yellow, never red (money states). */
+const TONE: Record<Tone, { label: string; className: string; labelClass: string }> = {
+  proposed: { label: "Proposed", className: "border-brand/40 bg-white text-ink", labelClass: "text-brand" },
+  countered: { label: "Countered", className: "border-[#DCE3B8] bg-citron text-ink", labelClass: "text-brand" },
+  accepted: { label: "Accepted", className: "border-brand bg-tint text-brand", labelClass: "text-brand" },
+  declined: { label: "Declined", className: "border-[#E9D48F] bg-butter text-honey", labelClass: "text-honey" },
+};
+
+/** Messages, plus a highlighted line for each proposal and decision, in time order. */
 function timeline(dispute: PaymentDispute, me: string, who: Who): Item[] {
   const member = dispute.member;
+  const memberName = who(member.user_id);
   const list: Item[] = dispute.messages.map((m) => ({ at: m.created_at, kind: "message", id: m.id, author: m.author_id, body: m.body }));
   dispute.proposals.forEach((p, i) => {
+    const verb = verbFor(dispute.proposals, i);
     list.push({
       at: p.created_at,
       kind: "note",
       id: `p-${p.id}`,
-      text: `${who(p.author_id)} ${verbFor(dispute.proposals, i)} ${proposalText(p, who(member.user_id))}.`,
+      tone: verb === "countered with" ? "countered" : "proposed",
+      text: `${who(p.author_id)} ${verb} ${proposalText(p, memberName)}`,
     });
     if (p.status === "accepted" && p.decided_at) {
       list.push({
         at: p.decided_at,
         kind: "note",
         id: `a-${p.id}`,
+        tone: "accepted",
         text:
           p.kind === "amount"
             ? `${who(p.decided_by)} accepted ${dollars(p.amount_cents ?? 0)}. The share goes back to Pending until ${member.user_id === me ? "you confirm" : `${member.first_name} confirms`} it.`
@@ -179,7 +193,8 @@ function timeline(dispute: PaymentDispute, me: string, who: Who): Item[] {
         at: p.decided_at,
         kind: "note",
         id: `k-${p.id}`,
-        text: `${who(p.decided_by)} kept the original amount of ${dollars(dispute.original_cents)}.`,
+        tone: "declined",
+        text: `${who(p.decided_by)} declined ${proposalText(p, memberName)} and kept the original amount of ${dollars(dispute.original_cents)}`,
       });
     }
   });
@@ -233,8 +248,15 @@ function ChatColumn({
         {items.length === 0 && <li className="m-auto text-sm text-muted">No messages yet. Say what you think is fair.</li>}
         {items.map((item) =>
           item.kind === "note" ? (
-            <li key={item.id} className="mx-auto max-w-[90%] rounded-xl bg-mist px-3 py-1.5 text-center text-[13px] text-[#3E4A43]">
-              {item.text} <span className="text-muted">· {stamp(item.at)}</span>
+            <li
+              key={item.id}
+              className={`mx-auto w-full max-w-[92%] rounded-xl border px-3.5 py-2 text-center ${TONE[item.tone].className}`}
+            >
+              <span className={`block text-[11px] font-extrabold tracking-[0.14em] uppercase ${TONE[item.tone].labelClass}`}>
+                {TONE[item.tone].label}
+              </span>
+              <span className="block text-sm font-bold">{item.text}</span>
+              <span className="block text-[11px] font-medium opacity-80">{stamp(item.at)}</span>
             </li>
           ) : (
             <li key={item.id} className={`flex flex-col ${item.author === me ? "items-end" : "items-start"}`}>
