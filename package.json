@@ -14,10 +14,12 @@
     "ai": "^7.0.166",
     "mammoth": "^1.13.0",
     "next": "16.4.5",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.5.438",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "read-excel-file": "^9.3.14",
+    "write-excel-file": "^4.1.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {

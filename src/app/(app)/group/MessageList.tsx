@@ -7,7 +7,7 @@ import { CardIcon, CheckIcon, CloseIcon, FileIcon, ReceiptIcon, UploadIcon } fro
 import { paymentRef } from "@/lib/alerts";
 import { signedLinks } from "@/lib/signedLinks";
 import type { createClient } from "@/lib/supabase/client";
-import { docRef, docTypeLabel, documentHref, type DocumentRequestView } from "./documents";
+import { docRef, docTypeLabel, documentHref, fileKindLabel, type DocumentRequestView } from "./documents";
 import { fileSize, type Attachment, type DraftFile, type MessagesState, type Outgoing } from "./messages";
 import { detailsHref, dollars, dueLabel, settleHref, SHARE_STATUS, type PaymentRequestView } from "./requests";
 import { personName, type Conversation, type Member } from "./types";
@@ -438,7 +438,9 @@ function Files({
             </span>
             <span className="flex min-w-0 flex-col">
               <span className="truncate text-sm font-bold">{f.name}</span>
-              <span className="text-xs text-muted">PDF · {fileSize(f.size)}</span>
+              <span className="text-xs text-muted">
+                {fileKindLabel({ mime_type: f.type, name: f.name })} · {fileSize(f.size)}
+              </span>
             </span>
           </a>
         ),

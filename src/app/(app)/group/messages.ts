@@ -232,7 +232,7 @@ export function uploadChatFile(supabase: Client, path: string, file: File, onPro
 /** Uploads a file to a private storage bucket with progress, as the signed-in person. */
 export function uploadFile(
   supabase: Client,
-  bucket: "chat-files" | "request-documents",
+  bucket: "chat-files" | "request-documents" | "drafts",
   path: string,
   file: File,
   contentType: string,

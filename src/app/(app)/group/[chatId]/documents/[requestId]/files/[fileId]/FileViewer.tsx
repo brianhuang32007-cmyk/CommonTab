@@ -263,7 +263,7 @@ type PdfPage = {
   };
 };
 
-function PdfView({ url }: { url: string }) {
+export function PdfView({ url }: { url: string }) {
   const { ref, width } = useWidth();
   const canvas = useRef<HTMLCanvasElement>(null);
   const [doc, setDoc] = useState<PdfDoc | null>(null);

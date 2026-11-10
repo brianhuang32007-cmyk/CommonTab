@@ -1,7 +1,8 @@
-import EmptyPage from "@/components/app/EmptyPage";
+import DraftingHome from "./DraftingHome";
 
 export const metadata = { title: "Document Drafting · CommonTab" };
 
+// /documents: Fill Out a Form and Build a Spreadsheet, plus your drafts.
 export default function Page() {
-  return <EmptyPage text="Upload receipts and draft payment or document requests with AI." />;
+  return <DraftingHome />;
 }

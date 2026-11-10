@@ -224,12 +224,26 @@ Built 2026-11-10 (Brian's calls). Migration `20261110220000_document_requests.sq
 - **Files tab** (Brian's call, 2026-11-10; migration `20261110250000_chat_documents.sql`): once a document is accepted it's kept in that chat's **Files** tab, so people can come back to it later: the title, type, who sent it to whom, when it was accepted, **AI Verified** or **Checked by hand**, the **original files** (open in the viewer), the **AI summary, key details and transcript** (if AI Verify was run) and **View Request**. Only the requester and the sender see it. Chat attachments aren't listed there yet.
 - **Code:** `src/app/(app)/group/documents.ts` (types, labels, links, file rules), `request/[kind]/DocumentForm.tsx`, `MessageList.tsx` (`DocumentCard`), `[chatId]/documents/[requestId]/` (`DocumentDetails.tsx`, `parts.tsx` for upload, review and AI results, `files/[fileId]/FileViewer.tsx`).
 
-## 7. Documents tab: the AI drafting tool
-- Paste a message ("cabin was $510 split 6 ways, due Fri") or upload a receipt.
-- AI drafts a payment request or document request (title, amount, split, due date, people).
-- If something's missing, AI asks in a short chat ("Who's included in the split?") instead of making the user fill in the form by hand.
-- AI helps fill out documents that someone has requested from you. *(Still to decide: exact scope, and whether this is in the MVP.)*
-- The user reviews and edits, then sends it to a chat. **AI never posts on its own.**
+## 7. Document Drafting (`/documents`): Fill Out a Form, and Build a Spreadsheet
+Built 2026-11-10 (Brian's design; migration `20261110260000_document_drafting.sql`). Two AI tools plus **My drafts** (forms and spreadsheets save as you go, only for you; delete with ×) and **Remembered answers** (count, **Forget All**). AI drafts; the person checks it and decides where it goes. **AI never sends anything.**
+
+**Fill Out a Form** (`/documents/form/<draft>`):
+1. **Upload the empty form** (PDF, Word .docx or a photo, 15 MB) to your own private storage (bucket `drafts`, path `<you>/<draft>/<file>`), and optionally pick **which chat it's for**.
+2. **AI turns it into simple questions** (a Google-Form-style page: text, long text, date, number, email, phone, checkbox, choice, signature), grouped by the form's sections, and **pre-fills what it already knows**, only from: **your profile** (name, birthday, phone, email, username), **answers you chose to remember**, and **the chat** (group name, payment and document requests with dates). Each pre-filled answer says where it came from ("Filled in from Your profile"); you can change everything. Route `src/app/api/ai/form/route.ts` (20 per person per day, feature `form`).
+3. **Signature:** type your name or draw it.
+4. **Finish Form** → CommonTab makes the filled PDF in the browser (`pdf-lib`): the **original PDF with its fields filled** when it has fillable fields (any answers without a matching field go on an extra page), otherwise a **clean new PDF** of every question and answer with the signature. Preview in the viewer, **Edit Answers** to go back.
+5. **Remember my answers** (on by default): saves your answers (never signatures) in `form_memory`, only for you.
+6. **Send it:** Download, **Send to a Chat** (posts the file as your message), or **Answer a Request** (sends it as your upload to a document request you were asked for; then AI Verify and review work as usual).
+
+**Build a Spreadsheet** (`/documents/sheet/<draft>`), e.g. a club leader asks for a track record of all costs:
+1. **Pick chats** (up to 10) and optional dates, and **say what you need** ("a track record of all trip costs", "who still owes money").
+2. **CommonTab AI reads those chats** (`sheet_sources`: payment requests with shares, payments and digital receipts; text messages; up to 6 photos or PDFs sent there; accepted documents' AI details; **only what you can already see**) and shows **a plan**: how many costs it found and from where, which tabs, and **questions** about anything unclear (Yes / No or typed answers; **Update with My Answers**). Route `src/app/api/ai/sheet/route.ts` (10 per person per day, feature `sheet`; model `AI_MODEL_SHEET` if set, else `AI_MODEL_DEFAULT`).
+3. **The sheet**, with tabs **Summary** (total costs, collected, still owed, by category), **All costs** (one row per cost: include, date, title, vendor, category, amount, paid by, source), **By person** (owed, paid, still owes, paid out of pocket) and **Receipt items**. Every row links to where it came from. **Payment request rows keep their real amounts (locked)**; costs read from messages or photos are marked **Check this · Confirm**.
+4. **Change it** with a prompt ("only October", "put the Costco run under Food") or by hand (edit cells, add or remove rows); **Undo** keeps the last 10 versions.
+5. **Send it:** Excel (.xlsx) **with real formulas** for every total, CSV or PDF; Download, Send to a Chat (chat files now take .xlsx and .csv) or Answer a Request.
+- **Plain code does all the math** (`computeSheet` in `src/app/(app)/documents/drafting.ts`). The AI only finds costs, labels categories, asks questions and plans; the server overrides any payment request amount with the database's.
+
+**Code:** `src/app/(app)/documents/` (`DraftingHome.tsx`, `drafting.ts` for types, math, exports and sending, `SendPanel.tsx`, `form/[draftId]/FormDraft.tsx`, `sheet/[draftId]/SheetDraft.tsx`).
 
 ## 8. Dashboard
 - **For you:** what you owe, what you're owed, what's overdue, and documents you need to upload.
@@ -279,7 +293,7 @@ Each step is something we build together, review, then commit.
 | 4. Documents | 12 | Document requests and uploads **(built; live test pending)** |
 | | 13 | AI receipt tools inside requests: scan and split, AI check on uploads |
 | 5. Dashboard | 14 | Dashboard: owe/owed/overdue and progress bars |
-| 6. AI | 15 | Documents tab: AI drafting with follow-up questions |
+| 6. AI | 15 | Document Drafting: Fill Out a Form and Build a Spreadsheet **(built; live test pending)** |
 | | 16 | CommonTab Agent: questions and answers **(done early: groups, chats, contacts, reading receipts; payment and document answers come as those steps land)** |
 | | 17 | Agent reminders (scheduled job) |
 | 7. Ship | 18 | Polish, mobile check, deploy, test run with a real group |
@@ -316,7 +330,11 @@ Tested with @briantest: a full negotiation (propose, decline, counter, accept), 
 
 **Built: Step 12, Request Document, with AI Verify from Step 13** (2026-11-10; migration `20261110220000_document_requests.sql`). See section 6. Still to test with a second account (e.g. @briantest): uploading, AI Verify on real files, accept and reject, Can't Provide, and the viewer with each file type.
 
-**After that:** 13 (the AI Verify part is built; scan and split stays with Request Payment), 14 (Dashboard money numbers), 15 (Documents tab), the rest of 16 (AI tools for requests: what you owe, who still owes; answer cards in `src/app/(app)/ai/blocks.tsx`), 17 (reminders). Build one piece at a time and plan each piece with Brian before writing code.
+**Done since:** owner can cancel document requests (an × on the card and page), shared **AI Verified** results with `AI_VERIFY_SECRET`, and accepted documents kept in each chat's **Files** tab (migrations `20261110230000` to `20261110250000` have all been run; all live).
+
+**Built: Step 15, Document Drafting** (2026-11-10; migration `20261110260000_document_drafting.sql`). See section 7. Still to test with real forms and chats: a fillable PDF, a Word form, a photo of a form, and a spreadsheet from a chat with payment requests and receipts.
+
+**After that:** 13 (the AI Verify part is built; scan and split stays with Request Payment), 14 (Dashboard money numbers), the rest of 16 (AI tools for requests: what you owe, who still owes; answer cards in `src/app/(app)/ai/blocks.tsx`), 17 (reminders). Build one piece at a time and plan each piece with Brian before writing code.
 
 Rules that still apply: amounts in whole cents and all math in plain code; money states never use red ("you owe" is ink, overdue and disputed are honey on butter); every write goes through checked database functions with app-made ids so retries can't duplicate; CommonTab never holds money.
 
@@ -327,4 +345,3 @@ Open questions:
 - Disputes: files in the dispute chat, and alerts for new dispute messages and proposals?
 - Payments: save the payment note and the payer's handle so the requester sees them?
 - Document requests: can a request be edited after it's sent (add people, change the due date)?
-- What's the scope of "AI helps fill out documents," and is it in the MVP?
