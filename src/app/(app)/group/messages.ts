@@ -257,7 +257,26 @@ export function uploadFile(
         // Already there (a retry after the reply was lost) counts as uploaded.
         if (xhr.status >= 200 && xhr.status < 300) resolve();
         else if (xhr.status === 409 || /already exists|Duplicate/i.test(xhr.responseText)) resolve();
-        else reject(new Error(xhr.status === 413 ? `That file is too big (${sizeLimit} max).` : xhr.status === 415 ? "That file type isn't allowed." : "Upload failed."));
+        else {
+          // Say why: the server's reason, in plain words where we know it.
+          let reason = "";
+          try {
+            reason = String((JSON.parse(xhr.responseText) as { message?: string }).message ?? "");
+          } catch {}
+          reject(
+            new Error(
+              xhr.status === 413 || /exceeded the maximum/i.test(reason)
+                ? `That file is too big (${sizeLimit} max).`
+                : xhr.status === 415 || /mime type/i.test(reason)
+                  ? "That file type isn't allowed."
+                  : /row-level security/i.test(reason)
+                    ? "You can't upload here right now. Refresh the page and try again."
+                    : /bucket not found/i.test(reason)
+                      ? "Uploads aren't set up yet. Try again later."
+                      : `Upload failed${reason ? `: ${reason}` : "."}`,
+            ),
+          );
+        }
       };
       xhr.onerror = () => reject(new Error("Upload failed. Check your connection."));
       xhr.onabort = () => reject(new Error("Cancelled"));
