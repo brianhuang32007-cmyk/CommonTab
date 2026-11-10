@@ -13,7 +13,8 @@ import { useProfile } from "./ProfileContext";
 // Sidebar contents: menu, preferences, payment handles and profile card.
 // Shown as a fixed sidebar on desktop and as the drop-down menu on phones.
 export default function SideNav({ onNavigate }: { onNavigate?: () => void }) {
-  const requestCount = useNotifications().requests.length;
+  const { requests, unreadMessages } = useNotifications();
+  const requestCount = requests.length;
   const pathname = usePathname();
   const profile = useProfile();
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -49,6 +50,14 @@ export default function SideNav({ onNavigate }: { onNavigate?: () => void }) {
             >
               <item.icon className={`h-5 w-5 shrink-0 ${active ? "text-brand" : "text-muted"}`} />
               <span className="grow">{item.label}</span>
+              {item.href === "/group" && unreadMessages > 0 && (
+                <span
+                  aria-label={`${unreadMessages} unread ${unreadMessages === 1 ? "message" : "messages"}`}
+                  className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-brand px-1.5 text-xs font-bold text-white"
+                >
+                  {unreadMessages > 99 ? "99+" : unreadMessages}
+                </span>
+              )}
               {item.href === "/contacts" && requestCount > 0 && (
                 <span
                   aria-label={`${requestCount} new ${requestCount === 1 ? "request" : "requests"}`}

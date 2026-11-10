@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
 import { ChevronLeftIcon, InfoIcon } from "@/components/app/icons";
+import { useNotifications } from "@/components/app/NotificationsContext";
 import type { createClient } from "@/lib/supabase/client";
 import Composer from "./Composer";
 import MessageList from "./MessageList";
@@ -38,6 +39,7 @@ export default function Conversation({
   const [visible, setVisible] = useState(true);
   const marked = useRef<number>(-1);
   const { add } = state;
+  const { refresh: refreshAlerts } = useNotifications();
 
   /* ---------- Sending ---------- */
 
@@ -92,15 +94,21 @@ export default function Conversation({
     return () => document.removeEventListener("visibilitychange", onChange);
   }, []);
 
-  const latest = state.messages.length ? state.messages[state.messages.length - 1].seq : 0;
+  const last = state.messages.length ? state.messages[state.messages.length - 1] : null;
+  const latest = last?.seq ?? 0;
+  const lastFromOthers = Boolean(last && last.sender_id !== me);
+  const hadUnread = chat.unread_count > 0 || chat.unread_mentions > 0;
   useEffect(() => {
     if (state.status !== "ready" || !atBottom || !visible) return;
-    if (latest <= marked.current && !chat.unread_mentions) return;
+    if (latest <= marked.current && !hadUnread) return;
     marked.current = latest;
     supabase.rpc("mark_conversation_read", { target: chat.id }).then(({ error }) => {
-      if (!error && chat.unread_mentions) onRead();
+      if (error) return;
+      // Update the chat list's badges, the bell and the Group tab's number.
+      if (hadUnread) onRead();
+      if (hadUnread || lastFromOthers) refreshAlerts();
     });
-  }, [supabase, chat.id, chat.unread_mentions, state.status, atBottom, visible, latest, onRead]);
+  }, [supabase, chat.id, hadUnread, lastFromOthers, state.status, atBottom, visible, latest, onRead, refreshAlerts]);
   const isGroup = chat.kind === "group";
   const other = otherMember(chat, me);
   const title = titleOf(chat, me);

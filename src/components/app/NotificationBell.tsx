@@ -5,12 +5,12 @@ import { useEffect, useId, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
 import { useNow } from "@/lib/useNow";
 import { BellIcon } from "./icons";
-import { isNewer, useNotifications } from "./NotificationsContext";
+import { isNewer, useNotifications, type MessageAlert } from "./NotificationsContext";
 
 // Alert bell in the top bar on every page. Opens a fixed-size drop-down of recent alerts
-// (for now: new contact requests). A red count shows how many are unread.
+// (new contact requests and unread chat messages). A red count shows how many are unread.
 export default function NotificationBell() {
-  const { requests, seenAt, unread, markRead, accept, decline } = useNotifications();
+  const { requests, messages, seenAt, unread, markRead, accept, decline } = useNotifications();
   const [open, setOpen] = useState(false);
   // What counted as "new" when the drop-down was opened, so those stay highlighted while it's open.
   const [highlightSince, setHighlightSince] = useState<string | null>(null);
@@ -48,10 +48,17 @@ export default function NotificationBell() {
   }, [open]);
 
   async function respond(id: string, action: (id: string) => Promise<boolean>) {
+    if (busy) return;
     setBusy(id);
     await action(id);
     setBusy(null);
   }
+
+  // Newest first: contact requests and chats with unread messages together.
+  const items = [
+    ...requests.map((r) => ({ kind: "contact" as const, key: `c-${r.user_id}`, time: r.requested_at, r })),
+    ...messages.map((m) => ({ kind: "message" as const, key: `m-${m.conversation_id}`, time: m.created_at, m })),
+  ].sort((a, b) => b.time.localeCompare(a.time));
 
   const label = unread ? `Alerts, ${unread} unread` : "Alerts";
 
@@ -88,23 +95,35 @@ export default function NotificationBell() {
         >
           <div className="flex shrink-0 items-center justify-between border-b border-line px-5 py-4">
             <p className="text-lg font-extrabold text-ink">Alerts</p>
-            {requests.length > 0 && <span className="text-xs font-bold text-muted">{requests.length}</span>}
+            {items.length > 0 && <span className="text-xs font-bold text-muted">{items.length}</span>}
           </div>
 
           {/* Fixed height: the list scrolls when there are more than fit. */}
-          {requests.length ? (
+          {items.length ? (
             <ul className="min-h-0 flex-1 overflow-y-auto">
-              {requests.map((r) => {
+              {items.map((item) => {
+                if (item.kind === "message") {
+                  return (
+                    <MessageItem
+                      key={item.key}
+                      alert={item.m}
+                      fresh={isNewer(item.time, highlightSince)}
+                      now={now}
+                      onOpen={() => setOpen(false)}
+                    />
+                  );
+                }
+                const r = item.r;
                 const name = `${r.first_name} ${r.last_name}`;
                 const fresh = isNewer(r.requested_at, highlightSince);
                 return (
-                  <li key={r.user_id} className={`border-b border-[#EEF1EA] px-5 py-4 ${fresh ? "bg-tint/60" : ""}`}>
+                  <li key={item.key} className={`border-b border-[#EEF1EA] px-5 py-4 ${fresh ? "bg-tint/60" : ""}`}>
                     <div className="flex items-start gap-3">
                       <Avatar src={r.avatar_url} name={name} seed={r.user_id} size={40} />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm text-ink">
-                          <span className="font-bold">{name}</span>{" "}
-                          <span className="text-muted">@{r.username}</span> sent you a contact request.
+                          <span className="font-bold">{name}</span> <span className="text-muted">@{r.username}</span> sent you a contact
+                          request.
                         </p>
                         {now && <p className="mt-0.5 text-xs text-muted">{timeAgo(r.requested_at, now)}</p>}
                         <div className="mt-2.5 flex gap-2">
@@ -138,7 +157,7 @@ export default function NotificationBell() {
                 <BellIcon className="h-6 w-6" />
               </span>
               <p className="font-bold text-ink">You&apos;re all caught up</p>
-              <p className="text-sm text-muted">New contact requests will show up here.</p>
+              <p className="text-sm text-muted">New messages and contact requests will show up here.</p>
             </div>
           )}
 
@@ -152,6 +171,55 @@ export default function NotificationBell() {
         </div>
       )}
     </div>
+  );
+}
+
+/** One chat with unread messages. Opens that chat. */
+function MessageItem({ alert, fresh, now, onOpen }: { alert: MessageAlert; fresh: boolean; now: Date | null; onOpen: () => void }) {
+  const sender = alert.sender_first_name ? `${alert.sender_first_name} ${alert.sender_last_name}` : "Former member";
+  const isGroup = alert.kind === "group";
+  const preview =
+    alert.preview || (alert.file_count ? `Sent ${alert.file_count === 1 ? "a file" : `${alert.file_count} files`}` : "New message");
+  const count = `${alert.unread_count} new ${alert.unread_count === 1 ? "message" : "messages"}`;
+  return (
+    <li className={`border-b border-[#EEF1EA] ${fresh ? "bg-tint/60" : ""}`}>
+      <Link href={`/group?chat=${alert.conversation_id}`} onClick={onOpen} className="flex items-start gap-3 px-5 py-4 hover:bg-mist">
+        {isGroup ? (
+          <Avatar
+            src={alert.picture_url}
+            name={alert.group_name ?? "Group"}
+            seed={alert.conversation_id}
+            size={40}
+            shape="square"
+            gradient={alert.avatar_gradient}
+          />
+        ) : (
+          <Avatar src={alert.sender_avatar_url} name={sender} seed={alert.sender_id ?? alert.conversation_id} size={40} />
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm text-ink">
+            <span className="font-bold">{sender}</span>
+            {isGroup ? (
+              <>
+                {" "}
+                {alert.mentions_me ? "mentioned you" : "wrote"} in <span className="font-bold">{alert.group_name}</span>
+              </>
+            ) : alert.mentions_me ? (
+              " mentioned you"
+            ) : (
+              " sent you a message"
+            )}
+          </span>
+          {/* Plain text only. */}
+          <span className="mt-0.5 block truncate text-sm text-[#3E4A43]">{preview}</span>
+          <span className="mt-0.5 block text-xs text-muted">
+            {count}
+            {now && ` · ${timeAgo(alert.created_at, now)}`}
+          </span>
+        </span>
+        {fresh && <span aria-label="New" className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-warn" />}
+      </Link>
+    </li>
   );
 }
 

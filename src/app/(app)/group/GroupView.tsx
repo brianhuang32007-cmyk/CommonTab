@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
 import { AddContactIcon, ChatIcon, CheckIcon, PlusIcon, SearchIcon } from "@/components/app/icons";
@@ -65,6 +66,7 @@ export default function GroupView() {
         chats: rows.map((c) => ({
           ...c,
           unread_mentions: c.unread_mentions ?? 0,
+          unread_count: c.unread_count ?? 0,
           picture_url: c.picture_path ? (links.get(c.picture_path) ?? null) : null,
         })),
       });
@@ -107,6 +109,24 @@ export default function GroupView() {
       supabase.removeChannel(channel);
     };
   }, [supabase, me, load]);
+
+  // A link like /group?chat=<id> (e.g. from an alert) opens that chat, then the address is tidied up.
+  const router = useRouter();
+  const linked = useSearchParams().get("chat");
+  const [handledLink, setHandledLink] = useState<string | null>(null);
+  if (!linked && handledLink) setHandledLink(null);
+  if (linked && linked !== handledLink && list.status === "ready") {
+    setHandledLink(linked);
+    const target = list.chats.find((c) => c.id === linked);
+    if (target) {
+      setActiveId(target.id);
+      setFilter(target.kind === "group" ? "groups" : "dms");
+      setPhoneShowsChat(true);
+    }
+  }
+  useEffect(() => {
+    if (linked && linked === handledLink) router.replace("/group", { scroll: false });
+  }, [linked, handledLink, router]);
 
   const chats = list.status === "ready" ? list.chats : [];
   const active =

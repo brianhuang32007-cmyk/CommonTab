@@ -192,10 +192,17 @@ export default function MessageList({
 
             {items.map((item, i) => {
               const prev = items[i - 1];
-              const newDay = !prev || dayKey(prev.createdAt) !== dayKey(item.createdAt);
+              // A date line starts each day (the first message's day is already shown above it
+              // when the conversation began that same day).
+              const newDay = prev
+                ? dayKey(prev.createdAt) !== dayKey(item.createdAt)
+                : hasOlder || dayKey(chat.created_at) !== dayKey(item.createdAt);
               // Messages from the same person within 5 minutes sit together under one name.
               const joined =
-                !newDay && prev.senderId === item.senderId && Date.parse(item.createdAt) - Date.parse(prev.createdAt) < 5 * 60 * 1000;
+                !newDay &&
+                prev !== undefined &&
+                prev.senderId === item.senderId &&
+                Date.parse(item.createdAt) - Date.parse(prev.createdAt) < 5 * 60 * 1000;
               return (
                 <Fragment key={item.id}>
                   {newDay && <DateLine iso={item.createdAt} />}

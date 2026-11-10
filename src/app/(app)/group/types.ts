@@ -35,6 +35,8 @@ export type Conversation = {
   members: Member[];
   /** Messages mentioning you that you haven't read yet (for the "@ You" badge). */
   unread_mentions: number;
+  /** Messages from others you haven't read yet. */
+  unread_count: number;
 };
 
 export const personName = (p: { first_name: string; last_name: string }) => `${p.first_name} ${p.last_name}`;
