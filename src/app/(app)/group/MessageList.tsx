@@ -559,7 +559,12 @@ function RequestCard({
 
       <div className="px-4 pt-3">
         <p className="text-lg leading-6 font-extrabold break-words">{request.title}</p>
-        <p className="mt-0.5 font-extrabold">{dollars(request.total_cents)} total</p>
+        <p className="mt-0.5 flex items-center gap-2 font-extrabold">
+          {dollars(request.total_cents)} total
+          {request.status === "settled" && (
+            <span className="rounded-full bg-brand px-2 py-0.5 text-[11px] font-bold text-white">Fully paid</span>
+          )}
+        </p>
         <p className="mt-0.5 text-[13px] text-muted">
           <span className={due.overdue ? "rounded-full bg-butter px-1.5 py-0.5 font-bold text-honey" : ""}>{due.text}</span> · Requested by{" "}
           {iAmPayee ? "you" : firstName(request.created_by)}

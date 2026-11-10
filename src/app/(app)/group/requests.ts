@@ -158,14 +158,31 @@ export type PaymentRequestDetails = PaymentRequestView & {
   }[];
   /** What happened to each share (missing before migration 20261110150000). */
   events?: ShareEvent[];
+  /** Payments you made or received on this request (missing before migration 20261110160000). */
+  transfers?: PaymentTransfer[];
 };
+
+/** A demo in-app payment: no real money moves; it records who paid whom, how and when. */
+export type PaymentTransfer = {
+  id: string;
+  payer_id: string;
+  first_name: string;
+  last_name: string;
+  amount_cents: number;
+  method: PayMethod;
+  confirmation: string;
+  created_at: string;
+};
+
+export type PayMethod = "venmo" | "paypal" | "zelle";
+export const PAY_METHOD_LABEL: Record<PayMethod, string> = { venmo: "Venmo", paypal: "PayPal", zelle: "Zelle" };
 
 /** One line of a share's history, visible to the group (never a dispute's reason or chat). */
 export type ShareEvent = {
   id: number;
   user_id: string;
   actor_id: string | null;
-  kind: "confirmed" | "disputed" | "amount_changed" | "waived";
+  kind: "confirmed" | "disputed" | "amount_changed" | "waived" | "paid";
   amount_cents: number | null;
   previous_cents: number | null;
   created_at: string;

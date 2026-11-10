@@ -14,6 +14,8 @@ import {
   disputeHref,
   disputeRoomHref,
   dollars,
+  PAY_METHOD_LABEL,
+  stamp,
   dueLabel,
   localDay,
   settleHref,
@@ -65,6 +67,7 @@ export default function RequestDetails() {
       .on("postgres_changes", { event: "*", schema: "public", table: "payment_shares" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "payment_requests" }, refresh)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "payment_share_events" }, refresh)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "payment_transfers" }, refresh)
       .subscribe();
     return () => {
       clearTimeout(timer);
@@ -144,7 +147,7 @@ export default function RequestDetails() {
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${allSettled ? "bg-brand text-white" : "bg-tint text-brand"}`}
                 >
-                  {allSettled ? "Settled" : "Open"}
+                  {allSettled ? "Fully paid" : "Open"}
                 </span>
                 <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${chip.className}`}>{chip.text}</span>
               </div>
@@ -173,7 +176,7 @@ export default function RequestDetails() {
               <p className="mt-3 rounded-2xl bg-tint px-4 py-3 text-sm text-ink">
                 {stillOwing === 0
                   ? "Everyone has paid you. Nothing left to collect."
-                  : `${stillOwing} ${stillOwing === 1 ? "person still owes" : "people still owe"} you. You'll approve each payment once they mark it paid.`}
+                  : `${stillOwing} ${stillOwing === 1 ? "person still owes" : "people still owe"} you. Each share turns Paid as soon as they pay.`}
               </p>
             </>
           ) : inSplit ? (
@@ -275,6 +278,32 @@ export default function RequestDetails() {
             </section>
           ))}
 
+        {/* Payments (demo, no real money): only the payer and the requester see these. */}
+        {(r.transfers ?? []).length > 0 && (
+          <section className="rounded-3xl border border-line bg-white p-6 sm:p-7">
+            <h3 className="text-lg font-extrabold">{iAmPayee ? "Payments Received" : "Your Payment"}</h3>
+            <p className="mt-1 text-[13px] text-muted">Demo payments: no real money moved.</p>
+            <ul className="mt-3 flex flex-col">
+              {(r.transfers ?? []).map((t) => (
+                <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[#EEF1EA] py-2.5 last:border-b-0">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-white">
+                    <CheckIcon className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-bold">
+                      {t.payer_id === me ? "You" : `${t.first_name} ${t.last_name}`} paid {dollars(t.amount_cents)}
+                    </span>
+                    <span className="block text-[13px] text-muted">
+                      {PAY_METHOD_LABEL[t.method]} · {stamp(t.created_at)}
+                    </span>
+                  </span>
+                  <span className="rounded-lg bg-mist px-2 py-1 font-mono text-[13px] font-bold tracking-wider">{t.confirmation}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {/* 5. Receipt */}
         {(r.receipt || r.receipt_path) && (
           <section className="rounded-3xl border border-line bg-white p-6 sm:p-7">
@@ -313,10 +342,15 @@ export default function RequestDetails() {
               when={r.created_at}
             />
             {(r.events ?? []).map((e) => (
-              <ActivityItem key={e.id} text={eventText(e, me)} when={e.created_at} />
+              <ActivityItem key={e.id} text={eventText(e, me)} when={e.created_at} done={e.kind === "paid"} />
             ))}
             {r.people
-              .filter((p) => p.status === "settled" && p.user_id !== r.payee_id)
+              .filter(
+                (p) =>
+                  p.status === "settled" &&
+                  p.user_id !== r.payee_id &&
+                  !(r.events ?? []).some((e) => e.kind === "paid" && e.user_id === p.user_id),
+              )
               .sort((a, b) => a.updated_at.localeCompare(b.updated_at))
               .map((p) => (
                 <ActivityItem
@@ -352,6 +386,8 @@ function eventText(e: ShareEvent, me: string) {
       return `${whose} share changed from ${dollars(e.previous_cents ?? 0)} to ${dollars(e.amount_cents ?? 0)} after a dispute`;
     case "waived":
       return `${whose} payment was canceled after a dispute`;
+    case "paid":
+      return `${name} paid ${dollars(e.amount_cents ?? 0)}`;
   }
 }
 
@@ -421,6 +457,8 @@ function PayerActions({
     );
   } else if (status === "waived") {
     note = `${payee} canceled your payment after your dispute. You don't owe anything.`;
+  } else if (status === "settled") {
+    note = `You paid ${payee}. Your receipt is below.`;
   }
 
   return (
