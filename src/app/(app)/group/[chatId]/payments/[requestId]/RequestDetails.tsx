@@ -10,7 +10,7 @@ import { useProfile } from "@/components/app/ProfileContext";
 import { formatUsPhone } from "@/lib/profile";
 import { signedLinks } from "@/lib/signedLinks";
 import { createClient } from "@/lib/supabase/client";
-import { dollars, dueLabel, localDay, settleHref, SHARE_STATUS, type PaymentRequestDetails } from "../../../requests";
+import { disputeHref, dollars, dueLabel, localDay, settleHref, SHARE_STATUS, type PaymentRequestDetails } from "../../../requests";
 
 // A payment request's Details page. It adapts to who's looking: the requester sees what
 // they're still owed, people paying see their share and Settle, everyone else sees that
@@ -97,6 +97,8 @@ export default function RequestDetails() {
   const allSettled = r.people.length > 0 && settled.length === r.people.length;
   const requester = r.creator ? (r.creator.user_id === me ? "you" : r.creator.first_name) : "a former member";
   const created = new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const stillOwing = r.people.filter((p) => p.status !== "settled" && p.user_id !== r.payee_id).length;
+  const canDispute = r.my_share_status === "pending" || r.my_share_status === "confirmed";
 
   const chip = iAmPayee
     ? { text: "You requested", className: "bg-tint text-brand" }
@@ -149,6 +151,11 @@ export default function RequestDetails() {
                 {dollars(collected)} collected of {dollars(r.total_cents)}
                 {r.my_share_cents !== null ? ", including your own share" : ""}.
               </p>
+              <p className="mt-3 rounded-2xl bg-tint px-4 py-3 text-sm text-ink">
+                {stillOwing === 0
+                  ? "Everyone has paid you. Nothing left to collect."
+                  : `${stillOwing} ${stillOwing === 1 ? "person still owes" : "people still owe"} you. You'll approve each payment once they mark it paid.`}
+              </p>
             </>
           ) : inSplit ? (
             <div className="flex flex-wrap items-center gap-4">
@@ -165,12 +172,22 @@ export default function RequestDetails() {
                 )}
               </div>
               {r.my_share_status !== "settled" && (
-                <Link
-                  href={settleHref(r.conversation_id, r.id)}
-                  className="flex h-12 items-center rounded-xl bg-brand px-6 font-bold text-white hover:bg-brand-hover"
-                >
-                  Settle
-                </Link>
+                <div className="flex w-full gap-2 sm:w-auto">
+                  {canDispute && (
+                    <Link
+                      href={disputeHref(r.conversation_id, r.id)}
+                      className="flex h-12 flex-1 items-center justify-center rounded-xl border border-line bg-white px-6 font-bold text-ink hover:bg-mist sm:flex-none"
+                    >
+                      Dispute
+                    </Link>
+                  )}
+                  <Link
+                    href={settleHref(r.conversation_id, r.id)}
+                    className="flex h-12 flex-1 items-center justify-center rounded-xl bg-brand px-6 font-bold text-white hover:bg-brand-hover sm:flex-none"
+                  >
+                    Settle
+                  </Link>
+                </div>
               )}
             </div>
           ) : (
@@ -181,7 +198,7 @@ export default function RequestDetails() {
         {/* 3. Who's in it */}
         <section className="rounded-3xl border border-line bg-white p-6 sm:p-7">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="text-lg font-extrabold">Who&apos;s in it</h3>
+            <h3 className="text-lg font-extrabold">{iAmPayee ? "Who owes you" : "Who's in it"}</h3>
             <p className="text-sm text-muted">Split {r.split === "equal" ? "equally" : "by custom amounts"}</p>
           </div>
           <div
@@ -207,7 +224,9 @@ export default function RequestDetails() {
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate font-bold">
                       {name}
-                      {p.user_id === r.payee_id && <span className="font-medium text-muted"> · requester</span>}
+                      {p.user_id === r.payee_id && (
+                        <span className="font-medium text-muted"> · {p.user_id === me ? "your own share" : "requester"}</span>
+                      )}
                     </span>
                     <span className="truncate text-[13px] text-muted">@{p.username}</span>
                   </span>
@@ -221,20 +240,26 @@ export default function RequestDetails() {
           </ul>
         </section>
 
-        {/* 4. Pay to */}
-        {r.payee && (
-          <section className="rounded-3xl border border-line bg-white p-6 sm:p-7">
-            <h3 className="text-lg font-extrabold">Pay to</h3>
-            <div className="mt-3 flex items-center gap-3">
-              <Avatar src={r.payee.avatar_url} name={`${r.payee.first_name} ${r.payee.last_name}`} seed={r.payee.user_id} size={40} />
-              <span className="flex min-w-0 flex-col">
-                <span className="truncate font-bold">{r.payee.user_id === me ? "You" : `${r.payee.first_name} ${r.payee.last_name}`}</span>
-                <span className="truncate text-[13px] text-muted">@{r.payee.username}</span>
-              </span>
-            </div>
-            <Handles payee={r.payee} isMe={iAmPayee} />
-          </section>
-        )}
+        {/* 4. Where the money goes: payers see who to pay and how; the requester sees how they get paid. */}
+        {r.payee &&
+          (iAmPayee ? (
+            <section className="rounded-3xl border border-line bg-white p-6 sm:p-7">
+              <h3 className="text-lg font-extrabold">How you get paid</h3>
+              <p className="mt-1 text-sm text-muted">People in this request see these handles when they pay you.</p>
+              <Handles payee={r.payee} isMe />
+            </section>
+          ) : inSplit ? (
+            <section className="rounded-3xl border border-line bg-white p-6 sm:p-7">
+              <h3 className="text-lg font-extrabold">Pay to</h3>
+              <PayeeRow payee={r.payee} />
+              <Handles payee={r.payee} isMe={false} />
+            </section>
+          ) : (
+            <section className="rounded-3xl border border-line bg-white p-6 sm:p-7">
+              <h3 className="text-lg font-extrabold">Paid to</h3>
+              <PayeeRow payee={r.payee} />
+            </section>
+          ))}
 
         {/* 5. Receipt */}
         {(r.receipt || r.receipt_path) && (
@@ -295,6 +320,20 @@ export default function RequestDetails() {
 }
 
 /* ---------- Pieces ---------- */
+
+function PayeeRow({ payee }: { payee: NonNullable<PaymentRequestDetails["payee"]> }) {
+  return (
+    <div className="mt-3 flex items-center gap-3">
+      <Avatar src={payee.avatar_url} name={`${payee.first_name} ${payee.last_name}`} seed={payee.user_id} size={40} />
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate font-bold">
+          {payee.first_name} {payee.last_name}
+        </span>
+        <span className="truncate text-[13px] text-muted">@{payee.username}</span>
+      </span>
+    </div>
+  );
+}
 
 function Handles({ payee, isMe }: { payee: NonNullable<PaymentRequestDetails["payee"]>; isMe: boolean }) {
   const [copied, setCopied] = useState<PaymentProvider | null>(null);

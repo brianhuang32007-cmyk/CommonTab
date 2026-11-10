@@ -120,6 +120,7 @@ export function dueLabel(due: string | null): { text: string; overdue: boolean }
 
 export const detailsHref = (chatId: string, requestId: string) => `/group/${chatId}/payments/${requestId}`;
 export const settleHref = (chatId: string, requestId: string) => `/group/${chatId}/payments/${requestId}/settle`;
+export const disputeHref = (chatId: string, requestId: string) => `/group/${chatId}/payments/${requestId}/dispute`;
 
 /** Everything the Details page shows (payment_request_details). */
 export type PaymentRequestDetails = PaymentRequestView & {
