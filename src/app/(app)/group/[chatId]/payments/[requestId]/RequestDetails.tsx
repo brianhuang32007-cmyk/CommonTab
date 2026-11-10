@@ -20,7 +20,7 @@ import {
   type PaymentRequestDetails,
   type ShareEvent,
 } from "../../../requests";
-import DisputePanel from "./DisputePanel";
+import DisputePanel, { type ChatFocus } from "./DisputePanel";
 
 // A payment request's Details page. It adapts to who's looking: the requester sees what
 // they're still owed, people paying see their share and Settle, everyone else sees that
@@ -38,6 +38,8 @@ export default function RequestDetails() {
   const supabase = useMemo(() => createClient(), []);
   const [state, setState] = useState<State>({ status: "loading" });
   const [photo, setPhoto] = useState<string | null>(null);
+  const [chatFocus, setChatFocus] = useState<ChatFocus | null>(null);
+  const openChat = (user: string | null) => setChatFocus((f) => ({ user, n: (f?.n ?? 0) + 1 }));
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.rpc("payment_request_details", { req: requestId });
@@ -183,7 +185,7 @@ export default function RequestDetails() {
                   </span>
                 )}
               </div>
-              <PayerActions request={r} onChanged={load} />
+              <PayerActions request={r} onChanged={load} onOpenChat={() => openChat(null)} />
             </div>
           ) : (
             <p className="text-sm text-muted">You&apos;re not part of this request, so there&apos;s nothing for you to pay.</p>
@@ -191,7 +193,7 @@ export default function RequestDetails() {
         </section>
 
         {/* The private dispute chat: only the requester and whoever is disputing see anything here. */}
-        {(iAmPayee || inSplit) && <DisputePanel requestId={r.id} me={me} payee={r.payee} onChanged={load} />}
+        {(iAmPayee || inSplit) && <DisputePanel requestId={r.id} me={me} payee={r.payee} focus={chatFocus} onChanged={load} />}
 
         {/* 3. Who's in it */}
         <section className="rounded-3xl border border-line bg-white p-6 sm:p-7">
@@ -217,7 +219,7 @@ export default function RequestDetails() {
               const status = SHARE_STATUS[p.status];
               const name = p.user_id === me ? "You" : `${p.first_name} ${p.last_name}`;
               return (
-                <li key={p.user_id} className="flex items-center gap-3 border-b border-[#EEF1EA] py-2.5 last:border-b-0">
+                <li key={p.user_id} className="flex flex-wrap items-center gap-3 border-b border-[#EEF1EA] py-2.5 last:border-b-0">
                   <Avatar src={p.avatar_url} name={`${p.first_name} ${p.last_name}`} seed={p.user_id} size={36} />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate font-bold">
@@ -232,6 +234,16 @@ export default function RequestDetails() {
                   <span className={`w-[92px] shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-bold ${status.className}`}>
                     {status.label}
                   </span>
+                  {/* The requester talks with each person disputing in a private chat. */}
+                  {iAmPayee && p.status === "disputed" && (
+                    <button
+                      type="button"
+                      onClick={() => openChat(p.user_id)}
+                      className="ml-12 h-11 rounded-xl bg-brand px-4 text-sm font-bold text-white hover:bg-brand-hover"
+                    >
+                      Open Dispute Chat
+                    </button>
+                  )}
                 </li>
               );
             })}
@@ -340,7 +352,15 @@ function eventText(e: ShareEvent, me: string) {
 }
 
 /** What someone paying can do next: confirm, then settle; dispute while Pending or Confirmed. */
-function PayerActions({ request: r, onChanged }: { request: PaymentRequestDetails; onChanged: () => void }) {
+function PayerActions({
+  request: r,
+  onChanged,
+  onOpenChat,
+}: {
+  request: PaymentRequestDetails;
+  onChanged: () => void;
+  onOpenChat: () => void;
+}) {
   const supabase = useMemo(() => createClient(), []);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -391,9 +411,9 @@ function PayerActions({ request: r, onChanged }: { request: PaymentRequestDetail
   } else if (status === "disputed") {
     note = `You're disputing this share. Work it out with ${payee} in the dispute chat before paying.`;
     buttons = (
-      <a href="#dispute" className={primary}>
+      <button type="button" onClick={onOpenChat} className={primary}>
         Open Dispute Chat
-      </a>
+      </button>
     );
   } else if (status === "waived") {
     note = `${payee} canceled your payment after your dispute. You don't owe anything.`;

@@ -13,26 +13,43 @@ import { dollars, parseCents, stamp, TOTAL_MAX_CENTS, type DisputeProposal, type
 
 type Person = { user_id: string; first_name: string; last_name: string };
 
+/** Ask the panel to open a chat: with this member (requester), or your own (member: null). */
+export type ChatFocus = { user: string | null; n: number };
+
 export default function DisputePanel({
   requestId,
   me,
   payee,
+  focus,
   onChanged,
 }: {
   requestId: string;
   me: string;
   payee: Person | null;
+  focus: ChatFocus | null;
   onChanged: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [disputes, setDisputes] = useState<PaymentDispute[] | null>(null);
-  const [picked, setPicked] = useState<string | null>(null);
-  const scrolled = useRef(false);
-  const ref = useRef<HTMLElement>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [seenFocus, setSeenFocus] = useState(0);
+  const [scrollKey, setScrollKey] = useState(0);
+  const fromForm = useRef(false);
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.rpc("my_payment_disputes", { req: requestId });
-    if (!error) setDisputes((data ?? []) as PaymentDispute[]);
+    if (error) return;
+    const list = (data ?? []) as PaymentDispute[];
+    setDisputes(list);
+    // Arrived from the Dispute form (…#dispute): open the new chat once.
+    if (!fromForm.current && window.location.hash === "#dispute") {
+      fromForm.current = true;
+      const first = list.find((d) => d.status === "open") ?? list[0];
+      if (first) {
+        setOpenId(first.id);
+        setScrollKey((k) => k + 1);
+      }
+    }
   }, [supabase, requestId]);
 
   // Live: messages, proposals and answers from the other side. The database only sends
@@ -55,69 +72,90 @@ export default function DisputePanel({
     };
   }, [supabase, requestId, load]);
 
-  // Opened from the Dispute form (…#dispute): bring the chat into view once it's loaded.
+  // "Open Dispute Chat" elsewhere on the page: open that chat (their open dispute first).
+  if (focus && disputes && focus.n !== seenFocus) {
+    setSeenFocus(focus.n);
+    const mine = disputes.filter((d) => focus.user === null || d.member.user_id === focus.user);
+    const target = mine.find((d) => d.status === "open") ?? mine[0];
+    if (target) {
+      setOpenId(target.id);
+      setScrollKey((k) => k + 1);
+    }
+  }
+
   useEffect(() => {
-    if (!disputes?.length || scrolled.current) return;
-    scrolled.current = true;
-    if (window.location.hash === "#dispute") ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [disputes]);
+    if (scrollKey && openId) document.getElementById(`dispute-${openId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [scrollKey, openId]);
 
   if (!disputes?.length) return null;
 
   const iAmRequester = payee?.user_id === me;
-  const current = disputes.find((d) => d.id === picked) ?? disputes[0];
   const openCount = disputes.filter((d) => d.status === "open").length;
   const other = (d: PaymentDispute): Person =>
     iAmRequester ? d.member : (payee ?? { user_id: "", first_name: "the requester", last_name: "" });
 
   return (
-    <section ref={ref} id="dispute" className="scroll-mt-4 rounded-3xl border border-line bg-white p-6 sm:p-7">
+    <section id="dispute" className="scroll-mt-4 rounded-3xl border border-line bg-white p-6 sm:p-7">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-lg font-extrabold">{iAmRequester ? "Disputes" : "Your dispute"}</h3>
-        {iAmRequester && <p className="text-sm text-muted">{openCount ? `${openCount} open` : "None open"}</p>}
+        <p className="text-sm text-muted">{openCount ? `${openCount} open` : "None open"}</p>
       </div>
+      <p className="mt-1 text-[13px] text-muted">
+        {iAmRequester
+          ? "Open a chat to talk it through, propose a new amount, or answer their proposal."
+          : "Open the chat to talk with the requester and propose a new amount or canceling your payment."}
+      </p>
 
-      {disputes.length > 1 && (
-        <ul className="mt-3 flex flex-col gap-1.5" aria-label="Disputes">
-          {disputes.map((d) => {
-            const active = d.id === current.id;
-            return (
-              <li key={d.id}>
+      <ul className="mt-3 flex flex-col gap-2" aria-label="Disputes">
+        {disputes.map((d) => {
+          const isOpenChat = d.id === openId;
+          const label = iAmRequester ? `${d.member.first_name} ${d.member.last_name}` : `Opened ${stamp(d.created_at)}`;
+          return (
+            <li
+              key={d.id}
+              id={`dispute-${d.id}`}
+              className={`scroll-mt-4 rounded-2xl border ${isOpenChat ? "border-brand" : "border-line"}`}
+            >
+              <div className="flex flex-wrap items-center gap-3 px-3 py-2.5">
+                {iAmRequester && (
+                  <Avatar
+                    src={d.member.avatar_url}
+                    name={`${d.member.first_name} ${d.member.last_name}`}
+                    seed={d.member.user_id}
+                    size={36}
+                  />
+                )}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate font-bold">{label}</span>
+                  <span className="text-[13px] text-muted">
+                    {d.status === "open"
+                      ? `Disputing ${dollars(d.original_cents)}`
+                      : d.resolution === "waived"
+                        ? "Payment canceled"
+                        : `Changed to ${dollars(d.final_cents ?? 0)}`}
+                  </span>
+                </span>
+                <StatusChip dispute={d} />
                 <button
                   type="button"
-                  onClick={() => setPicked(d.id)}
-                  aria-pressed={active}
-                  className={`flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left ${
-                    active ? "border-brand bg-tint" : "border-line bg-white hover:bg-mist"
+                  onClick={() => setOpenId(isOpenChat ? null : d.id)}
+                  aria-expanded={isOpenChat}
+                  className={`h-11 shrink-0 rounded-xl px-4 text-sm font-bold ${
+                    isOpenChat ? "border border-line bg-white text-ink hover:bg-mist" : "bg-brand text-white hover:bg-brand-hover"
                   }`}
                 >
-                  {iAmRequester && (
-                    <Avatar
-                      src={d.member.avatar_url}
-                      name={`${d.member.first_name} ${d.member.last_name}`}
-                      seed={d.member.user_id}
-                      size={28}
-                    />
-                  )}
-                  <span className="min-w-0 flex-1 truncate text-sm font-bold">
-                    {iAmRequester ? `${d.member.first_name} ${d.member.last_name}` : `Dispute from ${stamp(d.created_at)}`}
-                  </span>
-                  <StatusChip dispute={d} />
+                  {isOpenChat ? "Close Chat" : "Open Dispute Chat"}
                 </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      <Thread
-        key={current.id}
-        dispute={current}
-        me={me}
-        other={other(current)}
-        iAmRequester={iAmRequester}
-        onChanged={() => (load(), onChanged())}
-      />
+              </div>
+              {isOpenChat && (
+                <div className="border-t border-line px-3 pb-3 sm:px-4">
+                  <Thread dispute={d} me={me} other={other(d)} iAmRequester={iAmRequester} onChanged={() => (load(), onChanged())} />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
@@ -273,7 +311,7 @@ function Thread({
               onChanged={onChanged}
             />
           )}
-          {!iAmRequester && <ProposeTools disputeId={dispute.id} hasOwnOpen={open?.author_id === me} onChanged={onChanged} />}
+          <ProposeTools disputeId={dispute.id} hasOwnOpen={open?.author_id === me} canCancel={!iAmRequester} onChanged={onChanged} />
         </>
       )}
 
@@ -384,7 +422,17 @@ function OpenProposal({
 
 /* ---------- The member's proposals ---------- */
 
-function ProposeTools({ disputeId, hasOwnOpen, onChanged }: { disputeId: string; hasOwnOpen: boolean; onChanged: () => void }) {
+function ProposeTools({
+  disputeId,
+  hasOwnOpen,
+  canCancel,
+  onChanged,
+}: {
+  disputeId: string;
+  hasOwnOpen: boolean;
+  canCancel: boolean;
+  onChanged: () => void;
+}) {
   const supabase = useMemo(() => createClient(), []);
   const [mode, setMode] = useState<"none" | "amount" | "cancel">("none");
   const [busy, setBusy] = useState(false);
@@ -419,14 +467,16 @@ function ProposeTools({ disputeId, hasOwnOpen, onChanged }: { disputeId: string;
         >
           Propose New Amount
         </button>
-        <button
-          type="button"
-          onClick={() => setMode((m) => (m === "cancel" ? "none" : "cancel"))}
-          aria-expanded={mode === "cancel"}
-          className="h-11 rounded-xl border border-line bg-white px-4 text-sm font-bold text-ink hover:bg-mist"
-        >
-          Propose Canceling
-        </button>
+        {canCancel && (
+          <button
+            type="button"
+            onClick={() => setMode((m) => (m === "cancel" ? "none" : "cancel"))}
+            aria-expanded={mode === "cancel"}
+            className="h-11 rounded-xl border border-line bg-white px-4 text-sm font-bold text-ink hover:bg-mist"
+          >
+            Propose Canceling
+          </button>
+        )}
       </div>
       {mode === "amount" && (
         <AmountForm
