@@ -97,7 +97,9 @@ export default function DisputePanel({
                   ? `Disputing ${dollars(d.original_cents)}`
                   : d.resolution === "waived"
                     ? "Payment canceled"
-                    : `Changed to ${dollars(d.final_cents ?? 0)}`}
+                    : d.resolution === "withdrawn"
+                      ? `Dispute canceled · share stays ${dollars(d.final_cents ?? 0)}`
+                      : `Changed to ${dollars(d.final_cents ?? 0)}`}
               </span>
             </span>
             <DisputeStatusChip dispute={d} />

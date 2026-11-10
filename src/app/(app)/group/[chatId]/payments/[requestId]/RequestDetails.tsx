@@ -386,6 +386,8 @@ function eventText(e: ShareEvent, me: string) {
       return `${whose} share changed from ${dollars(e.previous_cents ?? 0)} to ${dollars(e.amount_cents ?? 0)} after a dispute`;
     case "waived":
       return `${whose} payment was canceled after a dispute`;
+    case "dispute_canceled":
+      return `${name} canceled ${you ? "your" : "their"} dispute; the share stays ${dollars(e.amount_cents ?? 0)}`;
     case "paid":
       return `${name} paid ${dollars(e.amount_cents ?? 0)}`;
   }

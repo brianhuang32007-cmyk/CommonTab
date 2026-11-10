@@ -149,7 +149,7 @@ export default function DisputeRoom() {
 
 /* ---------- Left: the chat ---------- */
 
-type Tone = "proposed" | "countered" | "accepted" | "declined";
+type Tone = "proposed" | "countered" | "accepted" | "declined" | "canceled";
 type Item =
   | { at: string; kind: "message"; id: string; author: string | null; body: string }
   | { at: string; kind: "note"; id: string; tone: Tone; text: string };
@@ -160,6 +160,7 @@ const TONE: Record<Tone, { label: string; className: string; labelClass: string 
   countered: { label: "Countered", className: "border-[#DCE3B8] bg-citron text-ink", labelClass: "text-brand" },
   accepted: { label: "Accepted", className: "border-brand bg-tint text-brand", labelClass: "text-brand" },
   declined: { label: "Declined", className: "border-[#E9D48F] bg-butter text-honey", labelClass: "text-honey" },
+  canceled: { label: "Dispute canceled", className: "border-line bg-mist text-ink", labelClass: "text-muted" },
 };
 
 /** Messages, plus a highlighted line for each proposal and decision, in time order. */
@@ -198,6 +199,15 @@ function timeline(dispute: PaymentDispute, me: string, who: Who): Item[] {
       });
     }
   });
+  if (dispute.resolution === "withdrawn" && dispute.resolved_at) {
+    list.push({
+      at: dispute.resolved_at,
+      kind: "note",
+      id: "withdrawn",
+      tone: "canceled",
+      text: `${memberName} canceled the dispute. The share stays ${dollars(dispute.final_cents ?? 0)} and goes back to Pending.`,
+    });
+  }
   return list.sort((a, b) => a.at.localeCompare(b.at));
 }
 
@@ -353,6 +363,7 @@ const PROPOSAL_STATUS: Record<DisputeProposal["status"], { label: string; classN
   countered: { label: "Countered", className: "bg-mist text-muted" },
   replaced: { label: "Replaced", className: "bg-mist text-muted" },
   persisted: { label: "Kept original", className: "bg-butter text-honey" },
+  canceled: { label: "Canceled", className: "bg-mist text-muted" },
 };
 
 const card = "rounded-3xl border border-line bg-white p-5";
@@ -383,12 +394,18 @@ function Negotiation({
         <section className={`${card} bg-tint`}>
           <p className={label}>Outcome</p>
           <p className="mt-1 text-lg font-extrabold">
-            {dispute.resolution === "waived" ? "Payment canceled" : `Share changed to ${dollars(dispute.final_cents ?? 0)}`}
+            {dispute.resolution === "waived"
+              ? "Payment canceled"
+              : dispute.resolution === "withdrawn"
+                ? "Dispute canceled"
+                : `Share changed to ${dollars(dispute.final_cents ?? 0)}`}
           </p>
           <p className="mt-1 text-sm text-ink">
             {dispute.resolution === "waived"
               ? `${memberName === "You" ? "You don't" : `${memberName} doesn't`} owe anything for this request.`
-              : `${memberName === "You" ? "Confirm it" : `${memberName} confirms it`} on the request before paying.`}
+              : dispute.resolution === "withdrawn"
+                ? `The share stays ${dollars(dispute.final_cents ?? 0)}. ${memberName === "You" ? "Confirm it" : `${memberName} confirms it`} on the request before paying.`
+                : `${memberName === "You" ? "Confirm it" : `${memberName} confirms it`} on the request before paying.`}
           </p>
           {dispute.resolved_at && <p className="mt-1 text-[13px] text-muted">{stamp(dispute.resolved_at)}</p>}
         </section>
@@ -433,6 +450,9 @@ function Negotiation({
           {!iAmRequester && <ProposeCancel disputeId={dispute.id} onChanged={onChanged} />}
         </section>
       )}
+
+      {/* The person who started it can cancel the dispute. */}
+      {isOpen && !iAmRequester && <CancelDispute disputeId={dispute.id} onChanged={onChanged} />}
 
       {/* History */}
       <section className={card}>
@@ -692,5 +712,72 @@ function ProposeCancel({ disputeId, onChanged }: { disputeId: string; onChanged:
         </p>
       )}
     </div>
+  );
+}
+
+/** The member only: cancel the dispute. The share keeps its amount and goes back to Pending. */
+function CancelDispute({ disputeId, onChanged }: { disputeId: string; onChanged: () => void }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  async function cancel() {
+    setBusy(true);
+    setProblem(null);
+    const { error } = await supabase.rpc("cancel_payment_dispute", { target: disputeId });
+    setBusy(false);
+    if (error) return setProblem(error.message);
+    setAsking(false);
+    onChanged();
+  }
+
+  return (
+    <section className={card}>
+      <p className={label}>Resolve it yourself</p>
+      {!asking ? (
+        <>
+          <p className="mt-1 text-sm text-muted">Changed your mind? Cancel the dispute and keep the current share.</p>
+          <button
+            type="button"
+            onClick={() => setAsking(true)}
+            className="mt-3 h-11 w-full rounded-xl border border-line bg-white px-4 text-sm font-bold text-ink hover:bg-mist"
+          >
+            Cancel Dispute
+          </button>
+        </>
+      ) : (
+        <div role="alertdialog" aria-label="Cancel this dispute?" className="mt-2 rounded-xl bg-butter p-3">
+          <p className="text-sm font-bold text-honey">Cancel this dispute?</p>
+          <p className="mt-0.5 text-[13px] text-ink">
+            Your share stays the same and goes back to Pending. Any open proposal is canceled. You&apos;ll confirm the share before paying.
+          </p>
+          <div className="mt-2.5 flex gap-2">
+            <button
+              type="button"
+              autoFocus
+              disabled={busy}
+              onClick={cancel}
+              className="h-11 flex-1 rounded-xl bg-ink px-3 text-sm font-bold text-white hover:bg-black disabled:opacity-60"
+            >
+              {busy ? "Canceling…" : "Yes, Cancel Dispute"}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setAsking(false)}
+              className="h-11 flex-1 rounded-xl border border-line bg-white px-3 text-sm font-bold disabled:opacity-60"
+            >
+              Keep It Open
+            </button>
+          </div>
+        </div>
+      )}
+      {problem && (
+        <p role="alert" className="mt-2 text-[13px] font-semibold text-warn">
+          {problem}
+        </p>
+      )}
+    </section>
   );
 }

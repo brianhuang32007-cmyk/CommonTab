@@ -182,7 +182,7 @@ export type ShareEvent = {
   id: number;
   user_id: string;
   actor_id: string | null;
-  kind: "confirmed" | "disputed" | "amount_changed" | "waived" | "paid";
+  kind: "confirmed" | "disputed" | "amount_changed" | "waived" | "paid" | "dispute_canceled";
   amount_cents: number | null;
   previous_cents: number | null;
   created_at: string;
@@ -196,7 +196,7 @@ export type PaymentDispute = {
   reason: string;
   original_cents: number;
   status: "open" | "resolved";
-  resolution: "new_amount" | "waived" | null;
+  resolution: "new_amount" | "waived" | "withdrawn" | null;
   final_cents: number | null;
   created_at: string;
   resolved_at: string | null;
@@ -209,7 +209,7 @@ export type DisputeProposal = {
   author_id: string | null;
   kind: "amount" | "cancel";
   amount_cents: number | null;
-  status: "open" | "accepted" | "countered" | "persisted" | "replaced";
+  status: "open" | "accepted" | "countered" | "persisted" | "replaced" | "canceled";
   created_at: string;
   decided_at: string | null;
   decided_by: string | null;
