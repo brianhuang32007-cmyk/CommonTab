@@ -78,10 +78,10 @@ Every page uses the same look. Approved dashboard design (desktop + phone): http
 | `mist` | `#F7F8F2` | Page background |
 | white | `#FFFFFF` | Cards, sidebar, inputs |
 | `night` | `#14231A` | Landing page footer only |
-| `warn` | `#B42318` | **Form error messages only** |
+| `warn` | `#B42318` | **Form error messages, and the unread count on the notification bell** |
 
 Rules:
-- **No red** for money states. "You owe" is dark `ink` text; overdue and disputed are `honey` text on `butter`. Red (`warn`) is only for form errors.
+- **No red** for money states. "You owe" is dark `ink` text; overdue and disputed are `honey` text on `butter`. Red (`warn`) is only for form errors and the bell's unread count (Brian's call).
 - **No gradients.** The one exception is the landing hero, where the photo fades into the page.
 - Keep text contrast readable (at least 4.5:1). Pale backgrounds always get dark text.
 - No emoji in the UI; use stroke icons (24px viewBox, 2px stroke, `currentColor`).
@@ -89,7 +89,7 @@ Rules:
 **Type and shapes:** Plus Jakarta Sans. Page titles 28–32px ExtraBold (800); card titles 18–20px ExtraBold; body 14–16px; small labels 11–12px Bold, uppercase with wide letter spacing. Cards are white with a 1px `line` border and 20–24px corners; buttons and inputs are 44–52px tall with 10–14px corners; badges and chips are fully rounded. Touch targets at least 44px.
 
 **Layout and names:**
-- **Desktop:** left sidebar with the logo; **Menu** (Dashboard, Group, Contacts, CommonTab AI, Documents & Receipts) and **Preferences** (Preferences, Log out); payment handles box (all three providers with their logos; missing ones show an underlined **Add handle** link) and profile card at the bottom. The profile card opens the **Profile** page. Top bar: page title on the left, a large live clock with the date in the center, the main action on the right (on the dashboard: **Add Contact**).
+- **Desktop:** left sidebar with the logo; **Menu** (Dashboard, Group, Contacts, CommonTab AI, Documents & Receipts) and **Preferences** (Preferences, Log out); payment handles box (all three providers with their logos; missing ones show an underlined **Add handle** link) and profile card at the bottom. The profile card opens the **Profile** page. Top bar: page title on the left, a large live clock with the date in the center, the **notification bell** on the right, on every page (on phones it sits in the header). The bell opens a fixed-size (380×440) drop-down of recent notifications that scrolls when full; for now notifications are only new contact requests, with Accept and Decline. Unread ones show a red count on the bell.
 - **Phone:** top bar with logo mark, title, action icon and profile photo (opens Profile); bottom tabs Home, Group, Contacts, AI, Docs.
 - **CommonTab AI** always uses the lightning-bolt icon and can be collapsed to an "Ask CommonTab AI" button. It drafts and suggests; the user taps to send.
 - Button labels use Title Case for main actions: **Add Contact**, **Create Group**.

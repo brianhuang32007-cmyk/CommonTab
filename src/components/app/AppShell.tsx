@@ -8,17 +8,18 @@ import { BoltIcon, CloseIcon, MenuIcon } from "./icons";
 import { pageTitle } from "./nav";
 import { ProfileProvider, type AppProfile } from "./ProfileContext";
 import SideNav from "./SideNav";
+import NotificationBell from "./NotificationBell";
+import { NotificationsProvider } from "./NotificationsContext";
 import TopBar from "./TopBar";
-import { useIncomingRequests } from "./useIncomingRequests";
 
 export default function AppShell({ profile, children }: { profile: AppProfile; children: React.ReactNode }) {
-  const requestCount = useIncomingRequests(profile.id);
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => setMenuOpen(false);
 
   return (
     <ProfileProvider value={profile}>
+      <NotificationsProvider userId={profile.id}>
       <div className="flex min-h-full flex-1 bg-mist">
         {/* Desktop sidebar */}
         <aside className="sticky top-0 hidden h-screen w-[280px] shrink-0 flex-col gap-6 overflow-y-auto border-r border-line bg-white px-4 py-6 lg:flex">
@@ -33,7 +34,7 @@ export default function AppShell({ profile, children }: { profile: AppProfile; c
             />
           </Link>
           <nav aria-label="Main" className="flex grow flex-col">
-            <SideNav requestCount={requestCount} />
+            <SideNav />
           </nav>
         </aside>
 
@@ -45,6 +46,7 @@ export default function AppShell({ profile, children }: { profile: AppProfile; c
                 <Image src="/brand/commontab-mark.svg" alt="" width={36} height={36} unoptimized className="h-9 w-9" />
               </Link>
               <p className="min-w-0 grow truncate text-[22px] font-extrabold tracking-tight text-ink">{pageTitle(pathname)}</p>
+              <NotificationBell />
               <button
                 type="button"
                 onClick={() => setMenuOpen((o) => !o)}
@@ -69,7 +71,7 @@ export default function AppShell({ profile, children }: { profile: AppProfile; c
                   aria-label="Main"
                   className="absolute inset-x-0 top-full z-10 max-h-[calc(100vh-69px)] overflow-y-auto border-b border-line bg-white px-4 pb-5 pt-4 shadow-lg"
                 >
-                  <SideNav onNavigate={closeMenu} requestCount={requestCount} />
+                  <SideNav onNavigate={closeMenu} />
                 </nav>
               </>
             )}
@@ -94,6 +96,7 @@ export default function AppShell({ profile, children }: { profile: AppProfile; c
           Ask CommonTab AI
         </Link>
       )}
+      </NotificationsProvider>
     </ProfileProvider>
   );
 }

@@ -7,11 +7,13 @@ import { signOut } from "@/app/(app)/actions";
 import { LogOutIcon } from "./icons";
 import { MENU, PREFERENCES } from "./nav";
 import { PaymentLogo, type PaymentProvider } from "./PaymentLogos";
+import { useNotifications } from "./NotificationsContext";
 import { useProfile } from "./ProfileContext";
 
 // Sidebar contents: menu, preferences, payment handles and profile card.
 // Shown as a fixed sidebar on desktop and as the drop-down menu on phones.
-export default function SideNav({ onNavigate, requestCount = 0 }: { onNavigate?: () => void; requestCount?: number }) {
+export default function SideNav({ onNavigate }: { onNavigate?: () => void }) {
+  const requestCount = useNotifications().requests.length;
   const pathname = usePathname();
   const profile = useProfile();
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
