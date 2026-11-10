@@ -202,7 +202,7 @@ export const SHARE_STATUS: Record<NonNullable<PaymentRequestView["my_share_statu
   pending: { label: "Pending", className: "bg-mist text-muted" },
   confirmed: { label: "Confirmed", className: "bg-tint text-brand" },
   marked_paid: { label: "Marked paid", className: "bg-tint text-brand" },
-  settled: { label: "Settled", className: "bg-brand text-white" },
+  settled: { label: "Paid", className: "bg-brand text-white" },
   // No red for money states: yellow with dark text.
   disputed: { label: "Disputed", className: "bg-butter text-honey" },
   waived: { label: "Waived", className: "bg-mist text-muted" },

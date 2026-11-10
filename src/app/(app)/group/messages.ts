@@ -86,6 +86,8 @@ export type MessagesState = {
   add: (m: Message) => void;
   /** Remove a message from the list (e.g. after deleting a payment request). */
   drop: (id: string) => void;
+  /** Re-read a payment request's card (after confirming, or when a share changes). */
+  refreshRequest: (requestId: string) => Promise<void>;
 };
 
 export function useMessages(supabase: Client, conversationId: string): MessagesState {
@@ -97,9 +99,21 @@ export function useMessages(supabase: Client, conversationId: string): MessagesS
   const busyOlder = useRef(false);
   const loadedOnce = useRef(false);
 
+  const latest = useRef<Message[]>([]);
   useEffect(() => {
     oldest.current = messages.length ? messages[0].seq : null;
+    latest.current = messages;
   }, [messages]);
+
+  const refreshRequest = useCallback(
+    async (requestId: string) => {
+      const { data } = await supabase.rpc("payment_request_view", { req: requestId });
+      if (!data) return;
+      const view = data as PaymentRequestView;
+      setMessages((current) => current.map((m) => (m.payment_request?.id === requestId ? { ...m, payment_request: view } : m)));
+    },
+    [supabase],
+  );
 
   const loadLatest = useCallback(async () => {
     const { data, error } = await supabase.rpc("conversation_messages", { target: conversationId, page_size: PAGE });
@@ -137,6 +151,11 @@ export function useMessages(supabase: Client, conversationId: string): MessagesS
         const id = (payload.old as { id?: string }).id;
         if (id) setMessages((current) => current.filter((m) => m.id !== id));
       })
+      // A share changed (confirmed, disputed, paid…): refresh that request's card if it's here.
+      .on("postgres_changes", { event: "*", schema: "public", table: "payment_shares" }, (payload) => {
+        const req = (payload.new as { request_id?: string }).request_id;
+        if (req && latest.current.some((m) => m.payment_request?.id === req)) refreshRequest(req);
+      })
       .subscribe((state) => {
         if (state !== "SUBSCRIBED") return;
         // Reconnected after a drop: catch up on anything missed.
@@ -150,7 +169,7 @@ export function useMessages(supabase: Client, conversationId: string): MessagesS
       clearTimeout(timer);
       supabase.removeChannel(channel);
     };
-  }, [supabase, conversationId, loadLatest]);
+  }, [supabase, conversationId, loadLatest, refreshRequest]);
 
   const loadOlder = useCallback(async () => {
     if (busyOlder.current || oldest.current === null) return;
@@ -178,7 +197,7 @@ export function useMessages(supabase: Client, conversationId: string): MessagesS
   const add = useCallback((m: Message) => setMessages((current) => merge(current, [m])), []);
   const drop = useCallback((id: string) => setMessages((current) => current.filter((m) => m.id !== id)), []);
 
-  return { status, messages, hasOlder, loadingOlder, loadOlder, retry, add, drop };
+  return { status, messages, hasOlder, loadingOlder, loadOlder, retry, add, drop, refreshRequest };
 }
 
 /** Uploads a chat file with progress. Uses the signed-in person's own session (never a secret key). */

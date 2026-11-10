@@ -7,7 +7,7 @@ import { CardIcon, CloseIcon, FileIcon, ReceiptIcon } from "@/components/app/ico
 import { signedLinks } from "@/lib/signedLinks";
 import type { createClient } from "@/lib/supabase/client";
 import { fileSize, type Attachment, type DraftFile, type MessagesState, type Outgoing } from "./messages";
-import { detailsHref, dollars, dueLabel, settleHref, type PaymentRequestView } from "./requests";
+import { detailsHref, dollars, dueLabel, settleHref, SHARE_STATUS, type PaymentRequestView } from "./requests";
 import { personName, type Conversation, type Member } from "./types";
 
 // The scrolling message history. Newest at the bottom; scrolling to the top loads older
@@ -226,6 +226,7 @@ export default function MessageList({
                     members={byId}
                     supabase={supabase}
                     onDrop={state.drop}
+                    onRequestChanged={state.refreshRequest}
                   />
                 </Fragment>
               );
@@ -286,6 +287,7 @@ function Bubble({
   members,
   supabase,
   onDrop,
+  onRequestChanged,
 }: {
   item: Item;
   mine: boolean;
@@ -301,6 +303,7 @@ function Bubble({
   members: Map<string, Member>;
   supabase: ReturnType<typeof createClient>;
   onDrop: (messageId: string) => void;
+  onRequestChanged: (requestId: string) => void;
 }) {
   const name = sender ? personName(sender) : "Former member";
   const o = item.outgoing;
@@ -322,7 +325,14 @@ function Bubble({
         )}
 
         {item.request && (
-          <RequestCard request={item.request} me={me} members={members} supabase={supabase} onDeleted={() => onDrop(item.id)} />
+          <RequestCard
+            request={item.request}
+            me={me}
+            members={members}
+            supabase={supabase}
+            onDeleted={() => onDrop(item.id)}
+            onChanged={() => onRequestChanged(item.request!.id)}
+          />
         )}
 
         {item.body && !item.request && (
@@ -458,12 +468,14 @@ function RequestCard({
   members,
   supabase,
   onDeleted,
+  onChanged,
 }: {
   request: PaymentRequestView;
   me: string;
   members: Map<string, Member>;
   supabase: ReturnType<typeof createClient>;
   onDeleted: () => void;
+  onChanged: () => void;
 }) {
   // The group owner or whoever made the request can delete it (the database checks too).
   const canDelete = request.created_by === me || members.get(me)?.role === "owner";
@@ -486,7 +498,28 @@ function RequestCard({
   const iAmPayee = request.payee_id === me;
   const inSplit = request.my_share_cents !== null && !iAmPayee;
   // Tagged to pay: they can settle. The sender and everyone else see Details only.
-  const canSettle = inSplit && request.my_share_status !== "settled" && request.my_share_status !== "waived";
+  // People paying confirm their share first; only then can they settle it.
+  const myStatus = request.my_share_status;
+  const action: "confirm" | "settle" | "dispute" | null = !inSplit
+    ? null
+    : myStatus === "pending"
+      ? "confirm"
+      : myStatus === "confirmed"
+        ? "settle"
+        : myStatus === "disputed"
+          ? "dispute"
+          : null;
+  const canSettle = action !== null;
+  const [confirmingShare, setConfirmingShare] = useState(false);
+  const [shareProblem, setShareProblem] = useState<string | null>(null);
+  async function confirmShare() {
+    setConfirmingShare(true);
+    setShareProblem(null);
+    const { error } = await supabase.rpc("confirm_payment_share", { req: request.id });
+    setConfirmingShare(false);
+    if (error) setShareProblem(error.message);
+    else onChanged();
+  }
   const firstName = (id: string | null) =>
     id === me ? "you" : id ? (members.get(id)?.first_name ?? "a former member") : "a former member";
 
@@ -553,11 +586,18 @@ function RequestCard({
             </span>
           </p>
         ) : inSplit ? (
-          <p className="flex items-baseline justify-between font-bold">
-            Your share
+          <p className="flex items-baseline justify-between gap-2 font-bold">
+            <span className="flex items-center gap-2">
+              Your share
+              {myStatus && (
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${SHARE_STATUS[myStatus].className}`}>
+                  {SHARE_STATUS[myStatus].label}
+                </span>
+              )}
+            </span>
             <span className="text-lg font-extrabold text-ink">
               {request.my_share_status === "settled"
-                ? "Settled"
+                ? "Paid"
                 : request.my_share_status === "waived"
                   ? "Waived"
                   : dollars(request.my_share_cents ?? 0)}
@@ -584,13 +624,34 @@ function RequestCard({
             <p className="mt-1.5 text-[13px] text-muted">
               {paid.length} of {payers.length} settled
             </p>
-            <p className="mt-1 text-[13px] text-ink">
-              <span className="font-bold text-brand">Paid:</span> {paid.length ? names(paid) : "no one yet"}
-            </p>
-            {waiting.length > 0 && (
-              <p className="text-[13px] text-ink">
-                <span className="font-bold">Not paid yet:</span> {names(waiting)}
-              </p>
+            {iAmPayee ? (
+              <ul className="mt-2 flex flex-col gap-1" aria-label="Where each person stands">
+                {payers.map((s) => {
+                  const st = s.status ? SHARE_STATUS[s.status] : null;
+                  return (
+                    <li key={s.user_id} className="flex items-center gap-2 text-[13px]">
+                      <span className="min-w-0 flex-1 truncate text-ink">{names([s])}</span>
+                      <span className="shrink-0 text-muted">{dollars(s.amount_cents)}</span>
+                      {st && (
+                        <span className={`w-[84px] shrink-0 rounded-full px-2 py-0.5 text-center text-[11px] font-bold ${st.className}`}>
+                          {st.label}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <>
+                <p className="mt-1 text-[13px] text-ink">
+                  <span className="font-bold text-brand">Paid:</span> {paid.length ? names(paid) : "no one yet"}
+                </p>
+                {waiting.length > 0 && (
+                  <p className="text-[13px] text-ink">
+                    <span className="font-bold">Not paid yet:</span> {names(waiting)}
+                  </p>
+                )}
+              </>
             )}
           </>
         )}
@@ -605,13 +666,39 @@ function RequestCard({
         >
           Details
         </Link>
-        {canSettle && (
+        {action === "confirm" && (
+          <button
+            type="button"
+            onClick={confirmShare}
+            disabled={confirmingShare}
+            className="flex h-11 items-center justify-center rounded-xl bg-brand text-sm font-bold text-white hover:bg-brand-hover disabled:opacity-60"
+          >
+            {confirmingShare ? "Confirming…" : "Confirm"}
+          </button>
+        )}
+        {action === "settle" && (
           <Link
             href={settleHref(request.conversation_id, request.id)}
             className="flex h-11 items-center justify-center rounded-xl bg-brand text-sm font-bold text-white hover:bg-brand-hover"
           >
             Settle
           </Link>
+        )}
+        {action === "dispute" && (
+          <Link
+            href={detailsHref(request.conversation_id, request.id)}
+            className="flex h-11 items-center justify-center rounded-xl bg-butter text-sm font-bold text-honey hover:bg-butter-strong"
+          >
+            In Dispute
+          </Link>
+        )}
+        {action === "confirm" && !shareProblem && (
+          <p className="col-span-2 text-center text-[12px] text-muted">Confirm your share before paying.</p>
+        )}
+        {shareProblem && (
+          <p role="alert" className="col-span-2 text-[13px] font-semibold text-warn">
+            {shareProblem}
+          </p>
         )}
       </div>
 
