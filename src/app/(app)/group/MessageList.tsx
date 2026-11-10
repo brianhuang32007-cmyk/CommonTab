@@ -490,8 +490,9 @@ function RequestCard({
   const firstName = (id: string | null) =>
     id === me ? "you" : id ? (members.get(id)?.first_name ?? "a former member") : "a former member";
 
-  // Progress counts the people who owe the payee (the payee's own share isn't something to collect).
-  const payers = (request.shares ?? []).filter((s) => s.user_id !== request.payee_id);
+  // Progress counts everyone in the split. A requester who included themselves is already
+  // settled, so it starts at "1 of N settled" with them under Paid.
+  const payers = request.shares ?? [];
   const paid = payers.filter((s) => s.status === "settled");
   const waiting = payers.filter((s) => s.status !== "settled");
   const percent = payers.length ? Math.round((paid.length / payers.length) * 100) : 0;

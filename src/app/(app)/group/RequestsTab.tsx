@@ -9,11 +9,9 @@ import { detailsHref, dollars, dueLabel, type PaymentRequestRow } from "./reques
 // first (overdue, then due soonest, then no due date). Each row opens that request's page.
 // Document requests join this list when they're built.
 
-/** "0 of 2 settled", counting only the people who owe the payee (as on the chat card). */
+/** "1 of 3 settled": everyone in the split, including a requester who's in it (already settled), as on the chat card. */
 function progress(r: PaymentRequestRow) {
-  const payers = (r.shares ?? []).filter((s) => s.user_id !== r.payee_id);
-  if (!r.shares) return `${r.settled_count} of ${r.share_count} settled`;
-  return `${payers.filter((s) => s.status === "settled").length} of ${payers.length} settled`;
+  return `${r.settled_count} of ${r.share_count} settled`;
 }
 
 type State = { status: "loading" } | { status: "error" } | { status: "ready"; rows: PaymentRequestRow[] };
