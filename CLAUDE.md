@@ -20,7 +20,7 @@ The first release targets adult student clubs and group trips, in one country an
 
 Brian's planning doc is the Google Doc titled **"CommonTab"** (ID `15eORCYKhQXNj7566QIsHyL8YxGEinnnxWzZmkV4gJR4`).
 
-- **Workflow** tab and its sub-tabs (WORKFLOW, BUILD ORDER, AI Model): the source of truth for the spec. Read them for context. If the doc and this file disagree, the doc wins; tell Brian about the mismatch.
+- **Workflow** tab and its sub-tabs (WORKFLOW, BUILD ORDER, AI Model): Brian's original plan. Read them for context only. **This file wins whenever the two disagree** (Brian's call, 2026-11-10); don't update the doc to match.
 - **Claude Notes** tab: write here only the notes Brian asks you to jot. Add dated entries at the end and never overwrite. Don't edit the other tabs unless asked.
 
 ## Rules
@@ -40,11 +40,15 @@ Brian's planning doc is the Google Doc titled **"CommonTab"** (ID `15eORCYKhQXNj
 | Login, database, file storage, scheduled jobs | Supabase (free tier) |
 | Hosting | Vercel (Hobby tier) |
 | AI library | Vercel AI SDK, so the provider is one setting and can be switched |
-| AI model | **Gemini Flash-Lite** (free tier) as the default. **Gemini Flash** as a fallback for receipts Flash-Lite can't parse. Switch to paid Gemini or Claude Haiku before real users upload real receipts (free-tier data may be used by Google). |
+| AI provider | **Vercel AI Gateway** (decided 2026-11-10). No Google key: the gateway reaches Gemini, Claude and others with one account, billed at the provider's list price with a monthly free credit. |
+| AI model | **Gemini 2.5 Flash-Lite** (`google/gemini-2.5-flash-lite`) as the default, with **GPT-4o mini** (`openai/gpt-4o-mini`) as the backup when it's down or busy (a different company). Both are on the AI Gateway **free tier** ($5 a month, tested 2026-11-10) and read photos and PDFs. Claude Haiku 5.5 was the first pick, but it needs paid credits (free tier says "no access"); switch to it by buying credits and changing `AI_MODEL_DEFAULT`. A receipt the model can't read goes to the manual form. |
 
-Check exact model names and free-tier limits in Google AI Studio. Keep model names in environment variables, not code.
+Model names are exact gateway ids (`provider/model`); check them at https://ai-gateway.vercel.sh/v1/models and the free-tier list in the Vercel dashboard (AI Gateway tab). Keep model names in environment variables, not code.
 
-**AI is on hold until Step 13.** Google now issues Gemini "auth keys" (`AQ.…`, bound to a service account). Our test key mostly failed with empty 404s and `ACCESS_TOKEN_TYPE_UNSUPPORTED`, so no AI code exists yet. When we resume, the easiest option is Vercel AI Gateway (no Google key needed); Brian decides. `.env.local` already has `AI_MODEL_DEFAULT=gemini-3.5-flash-lite` and `AI_MODEL_FALLBACK=gemini-3.8-flash`.
+**AI is the current focus (the CommonTab AI bot, Step 16).** No AI code exists yet. We tried a direct Gemini key first, but Google's new "auth keys" (`AQ.…`) failed with empty 404s and `ACCESS_TOKEN_TYPE_UNSUPPORTED`, so we use **Vercel AI Gateway** instead.
+- **Keys:** on Vercel, deployments sign in to the gateway automatically (OIDC), so production needs no AI secret. Locally, Brian creates an AI Gateway API key in the Vercel dashboard and puts it in `.env.local` as `AI_GATEWAY_API_KEY` himself (never in chat or code).
+- **Models:** `.env.local` has `AI_GATEWAY_API_KEY`, `AI_MODEL_DEFAULT=google/gemini-2.5-flash-lite` and `AI_MODEL_FALLBACK=openai/gpt-4o-mini` (2026-11-10). The `ai_calls` log records which model actually answered, so check it if answers seem off (that's how we found Haiku silently falling back). Vercel Production still needs the two model variables, but **not** the API key (the live site uses OIDC; a key there would override it).
+- **Spend:** set an AI Gateway budget in the dashboard, alongside the per-user daily limits below.
 
 ## Project facts
 
@@ -130,11 +134,16 @@ Tab names follow the approved dashboard design (they used to be Chats, Agent and
 - Friends list.
 
 ## 3. Groups and chats
-- Create a group with a name, description and picture.
-- Invite people from your friends list.
-- Two roles: **organizer** and **member**.
-- Real-time messaging in groups, plus one-on-one direct messages.
-- **@tagging** people in chat. Tagging is how payment and document requests get assigned.
+- Create a group with a name, description and picture (or a random color with its initials).
+- Invite people from your contacts. **Invites add them right away** (no accept step).
+- Three roles: **owner** (whoever created the group; one per group), **organizer** and **member**.
+  - Owner: invite or remove anyone, make people members or organizers, edit or delete the group, and hand ownership to another member (becoming an organizer).
+  - Organizer: invite contacts as members, edit the group, and remove only the people they added.
+  - Member: can't invite or remove anyone.
+- All of this lives in the group's **Details** window.
+- Real-time messaging in groups, plus one-on-one direct messages, with photo and PDF attachments.
+- **@mentions** in chat, stored by user id. Tagging is how payment and document requests will get assigned.
+- New messages show in the alert bell, and the Group tab shows the unread count.
 
 ## 4. Payment requests (tagged)
 - Create one from a chat. Fields: title, purpose, total, due date, receipt (photo or PDF), and tagged people.
@@ -213,9 +222,9 @@ Each step is something we build together, review, then commit.
 | | 3 | Preferences and Profile: edit profile, photo and payment handles, reminders, privacy, account **(done)** |
 | | 4 | Navigation bar with the tabs (placeholder pages) |
 | 2. Social | 5 | Contacts: add friends by username, friends list **(built; live test pending)** |
-| | 6 | Groups: create a group, invite friends, roles **(current)** |
-| | 7 | Real-time chat and direct messages **(current)** |
-| | 8 | @tagging in chat |
+| | 6 | Groups: create a group, invite friends, roles **(done)** |
+| | 7 | Real-time chat and direct messages **(done)** |
+| | 8 | @tagging in chat **(@mentions done; tagging requests comes with Steps 9 and 12)** |
 | 3. Money | 9 | Payment requests with equal and custom splits |
 | | 10 | Confirm, dispute and dispute threads |
 | | 11 | Pay buttons (Venmo, PayPal, Zelle) and settlement with proof |
@@ -223,27 +232,28 @@ Each step is something we build together, review, then commit.
 | | 13 | AI receipt tools inside requests: scan and split, AI check on uploads |
 | 5. Dashboard | 14 | Dashboard: owe/owed/overdue and progress bars |
 | 6. AI | 15 | Documents tab: AI drafting with follow-up questions |
-| | 16 | CommonTab Agent: questions and answers |
+| | 16 | CommonTab Agent: questions and answers **(current; moved ahead of Steps 9 to 15)** |
 | | 17 | Agent reminders (scheduled job) |
 | 7. Ship | 18 | Polish, mobile check, deploy, test run with a real group |
 
 ## Current step
 
-Steps 1, 2 and 3 are done and live (last update: 2026-11-10). The app frame is also built: every signed-in page shares `src/app/(app)/layout.tsx` (sidebar, top bar with live clock, phone drop-down menu). The dashboard shows the approved design with empty data; Group, CommonTab AI, Document Drafting and Alerts & Reminders are "Coming soon" placeholders.
+Last update: 2026-11-10. Steps 1 to 3 and 5 to 7 are done and live (Step 4 is covered by the app frame in `src/app/(app)/layout.tsx`). Contacts still needs a live test with two accounts.
 
-**Step 3 (Preferences and Profile) is done and live.** The app frame already covers most of Step 4 (navigation).
+**Done: Steps 6 and 7, Groups and chats** (migrations `20261110030000` to `20261110090000` have all been run). Code is in `src/app/(app)/group/`. Groups with owner, organizer and member roles; a Details window (members, roles, Invite Contacts with search, Edit Group, Delete Group, Make Owner); DMs; chat with date lines, older messages on scroll, live updates, attachments (JPG, PNG, WebP or PDF, up to 5 at 10 MB each, private to members) and @mentions; an "@ You" badge on chats with unread mentions; new messages in the alert bell; and the unread count on the Group tab. Group pictures and chat files are private and open through short-lived links (`src/lib/signedLinks.ts`). Every write goes through checked database functions, and app-made ids stop duplicates on retry.
 
-**Step 5, Contacts, is built and live** (migration `20261110010000_contacts.sql` has been run). Username search (top 10, prefix first), requests that must be accepted, contacts list (starred first, then A to Z; 12 visible, then scroll), private stars, a profile pop-up (handles, phone if shared, groups in common) and live updates through Supabase Realtime. The alert bell (migration `20261110020000_notifications.sql`) shows new contact requests on every page. Default profile pictures are initials on a soft color picked from the account (`src/components/Avatar.tsx`). A live test with two accounts is still to do.
+Known gaps from Steps 6 and 7:
+- Contacts' Message icon and the profile pop-up's Message button link to `/group?dm=<username>`, which doesn't open the DM yet (`/group?chat=<id>` does).
+- Sending, attachments, the "@ You" badge and message alerts still need a live test with a second account (e.g. @briantest).
+- Drafts aren't kept when switching chats. Files left behind when the browser closes mid-upload aren't cleaned up yet (a scheduled cleanup could come with Step 17).
 
-**Current: Steps 6 and 7, Groups and chats.** Build them together, one piece at a time, and plan each piece with Brian before writing code. Pieces already waiting for them:
-- `/group` is a "Coming soon" placeholder.
-- The Contacts message icon and the profile pop-up's Message button link to `/group?dm=<username>`.
-- The profile pop-up's "Groups in common" list is empty until groups exist (2 visible, then scroll).
-- `Avatar` has `shape="square"` for group pictures.
-- Invites come only from your contacts. Chat uses Supabase Realtime, the same way Contacts does.
+**Current: Step 16, the CommonTab AI bot, before payment requests and documents** (Brian's call, 2026-11-10). Build it one piece at a time and plan each piece with Brian before writing code. What's already there:
+- `/ai` is a "Coming soon" placeholder; the CommonTab AI button (lightning icon) shows only on the Dashboard.
+- There are no payment requests or documents yet, so for now the bot can only see the user's own groups, chats, messages and contacts.
+- Rules that apply: AI calls run server-side only (Next.js API routes), keys stay in environment variables, the bot only sees the signed-in user's own data, it drafts and suggests but never posts, approves or pays, and plain code does any math. See also "AI cost protections" above (login, daily limits, logging, fallback).
 
 Open questions:
-- CLAUDE.md and the planning doc disagree in places (5 vs 6 tabs, Settings, Steps 13/15, whose Zelle handle the button shows). Brian hasn't said which is current; the Google Doc also still says "magic link".
-- Groups: does an invite need to be accepted, or does it add the person right away? Can members invite, or only organizers? Can a group have more than one organizer, and what happens when the organizer leaves?
+- AI bot: what should it answer before requests exist (e.g. summarize a chat, find a message)? Where are its conversations stored, and what are the daily limits?
+- Groups: what happens when the owner deletes their account?
 - Can any member create payment requests, or only organizers?
 - What's the scope of "AI helps fill out documents," and is it in the MVP?
