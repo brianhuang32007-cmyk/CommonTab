@@ -112,10 +112,15 @@ export default function GroupView() {
 
   // A link like /group?chat=<id> (e.g. from an alert) opens that chat, then the address is tidied up.
   const router = useRouter();
-  const linked = useSearchParams().get("chat");
+  // /group?new=group (the dashboard's Create Group) opens the New Group form.
+  const params = useSearchParams();
+  const linked = params.get("chat") ?? (params.get("new") === "group" ? "new-group" : null);
   const [handledLink, setHandledLink] = useState<string | null>(null);
   if (!linked && handledLink) setHandledLink(null);
-  if (linked && linked !== handledLink && list.status === "ready") {
+  if (linked === "new-group" && linked !== handledLink) {
+    setHandledLink(linked);
+    setDialog("group");
+  } else if (linked && linked !== handledLink && list.status === "ready") {
     setHandledLink(linked);
     const target = list.chats.find((c) => c.id === linked);
     if (target) {

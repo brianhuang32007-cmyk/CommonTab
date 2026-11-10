@@ -7,28 +7,17 @@ import { useProfile } from "@/components/app/ProfileContext";
 import { groupPictureLinks } from "@/lib/groupPictures";
 import { createClient } from "@/lib/supabase/client";
 import { AssistantMessage, type ChatEntry } from "./blocks";
+import { FILE_TYPES, fileProblem as checkFile, useAiChat } from "./useAiChat";
 
 // The CommonTab AI page: a chat with the assistant, quick actions, and a box to ask in.
-// Questions go to /api/ai/chat (server only), and answers stream in word by word.
-// Nothing is saved yet; the conversation clears when you leave the page.
+// Sending and streaming answers live in useAiChat (shared with the dashboard's chat window).
 
 type Group = { id: string; name: string; picture_url: string | null; avatar_gradient: number | null };
-
-const FILE_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
-/** Photos are shrunk to this size before they're sent; PDFs can't be, so they have a smaller limit. */
-const PHOTO_EDGE = 1600;
-const PHOTO_MAX = 10 * 1024 * 1024;
-const PDF_MAX = 3 * 1024 * 1024;
-const READ_FILE = "Read this file and tell me what's in it.";
-const UNAVAILABLE = "CommonTab AI is unavailable right now. Try again in a moment.";
-/** How much of the conversation goes back to the AI with each question. */
-const HISTORY = 12;
-type Turn = { role: "user" | "assistant"; content: string };
 
 export default function AiView() {
   const { firstName } = useProfile();
   const supabase = useMemo(() => createClient(), []);
-  const [entries, setEntries] = useState<ChatEntry[]>([]);
+  const { entries, setEntries, asking, remaining, send: ask } = useAiChat();
   const [text, setText] = useState("");
   const [groups, setGroups] = useState<Group[] | null>(null); // null while loading
   const [groupsFailed, setGroupsFailed] = useState(false);
@@ -36,9 +25,6 @@ export default function AiView() {
   const [file, setFile] = useState<File | null>(null);
   const [fileProblem, setFileProblem] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
-  const [asking, setAsking] = useState(false);
-  const [remaining, setRemaining] = useState<number | null>(null);
-  const stop = useRef<AbortController | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -103,100 +89,15 @@ export default function AiView() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [entries]);
 
-  // Leaving the page stops an answer that's still coming in.
-  useEffect(() => () => stop.current?.abort(), []);
-
   const question = text.trim();
   const canSend = (question !== "" || file !== null) && !asking;
 
-  const update = (id: string, change: Partial<Extract<ChatEntry, { role: "assistant" }>>) =>
-    setEntries((list) => list.map((e) => (e.id === id && e.role === "assistant" ? { ...e, ...change } : e)));
-
-  async function send() {
+  function send() {
     if (!canSend) return;
-    const at = new Date().toISOString();
-    const attached = file;
-    const userEntry: ChatEntry = {
-      id: crypto.randomUUID(),
-      role: "user",
-      text: question,
-      at,
-      group: group?.name ?? null,
-      file: attached?.name ?? null,
-      preview: attached?.type.startsWith("image/") ? URL.createObjectURL(attached) : null,
-    };
-    const replyId = crypto.randomUUID();
+    ask({ question, file, group });
     setText("");
     setFile(null);
     setFileProblem(null);
-
-    // The recent conversation (text only, without the app's own notes), then the new question.
-    // Earlier files aren't sent again; the AI's earlier answers already describe them.
-    const history = entries
-      .flatMap((e): Turn[] => {
-        if (e.role === "user") {
-          const said = [e.text, e.file ? `(I attached ${e.file}.)` : ""].filter(Boolean).join(" ");
-          return said ? [{ role: "user" as const, content: said }] : [];
-        }
-        if (e.local || e.state === "error") return [];
-        const said = e.blocks.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("\n");
-        return said ? [{ role: "assistant" as const, content: said }] : [];
-      })
-      .slice(-HISTORY);
-    const messages: Turn[] = [...history, { role: "user", content: question || READ_FILE }];
-    // The AI needs the conversation to start with a question.
-    while (messages.length && messages[0].role !== "user") messages.shift();
-
-    setEntries((list) => [
-      ...list,
-      userEntry,
-      { id: replyId, role: "assistant", blocks: [{ type: "text", text: "" }], at, state: "thinking" },
-    ]);
-    setAsking(true);
-    const controller = new AbortController();
-    stop.current = controller;
-
-    try {
-      // Photos are shrunk first (receipts stay readable, and the upload stays small).
-      const filePart = attached ? await prepareFile(attached) : null;
-      const res = await fetch("/api/ai/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages, groupId: group?.id ?? null, file: filePart }),
-        signal: controller.signal,
-      });
-      const left = res.headers.get("X-AI-Remaining");
-      if (left !== null) setRemaining(Number(left));
-      if (!res.ok || !res.body) {
-        const problem = ((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? UNAVAILABLE;
-        update(replyId, { blocks: [{ type: "text", text: problem }], state: "error" });
-        return;
-      }
-
-      // Words arrive as they're written.
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let said = "";
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        said += decoder.decode(value, { stream: true });
-        update(replyId, { blocks: [{ type: "text", text: said }], state: "streaming" });
-      }
-      said += decoder.decode();
-      const final = said.trim();
-      update(
-        replyId,
-        final
-          ? { blocks: [{ type: "text", text: final }], state: "done" }
-          : { blocks: [{ type: "text", text: UNAVAILABLE }], state: "error" },
-      );
-    } catch {
-      if (!controller.signal.aborted) update(replyId, { blocks: [{ type: "text", text: UNAVAILABLE }], state: "error" });
-    } finally {
-      setAsking(false);
-      stop.current = null;
-    }
   }
 
   function suggest(prompt: string) {
@@ -318,11 +219,8 @@ export default function AiView() {
                 const picked = e.target.files?.[0];
                 e.target.value = "";
                 if (!picked) return;
-                if (!FILE_TYPES.includes(picked.type)) return setFileProblem("Files must be a JPG, PNG, WebP or PDF.");
-                if (picked.type === "application/pdf" && picked.size > PDF_MAX) {
-                  return setFileProblem("PDFs must be 3 MB or smaller. Try a photo of the page instead.");
-                }
-                if (picked.size > PHOTO_MAX) return setFileProblem("Photos must be 10 MB or smaller.");
+                const problem = checkFile(picked);
+                if (problem) return setFileProblem(problem);
                 setFileProblem(null);
                 setFile(picked);
               }}
@@ -488,33 +386,4 @@ function Chip({ label, onRemove, removeLabel }: { label: string; onRemove: () =>
       </button>
     </span>
   );
-}
-
-/** Turns an attached file into what the AI route expects. Photos are shrunk to at most
- *  1600 px on the longest side (as a JPEG); PDFs are sent as they are (3 MB at most). */
-async function prepareFile(file: File): Promise<{ name: string; mediaType: string; data: string }> {
-  if (file.type === "application/pdf") return { name: file.name, mediaType: file.type, data: await base64(file) };
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, PHOTO_EDGE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Couldn't prepare the photo.");
-  ctx.fillStyle = "#FFFFFF"; // transparent PNGs get a white background
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
-  if (!blob) throw new Error("Couldn't prepare the photo.");
-  return { name: file.name, mediaType: "image/jpeg", data: await base64(blob) };
-}
-
-function base64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
 }
