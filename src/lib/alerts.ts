@@ -196,7 +196,9 @@ export function describeEvent(e: RequestEvent): { title: string; detail: string;
     case "cant_provide":
       return { title: "Can't provide it", detail: e.note ? `${who}: ${e.note}` : `${who} can't provide the document`, tone: "warn" };
     case "cancelled":
-      return { title: "Request canceled", detail: "Nothing more is needed", tone: "info" };
+      return e.i_am_requester
+        ? { title: "Request canceled", detail: `${e.actor_first_name ?? "The group owner"} canceled your request`, tone: "info" }
+        : { title: "Request canceled", detail: "Nothing more is needed", tone: "info" };
   }
 }
 

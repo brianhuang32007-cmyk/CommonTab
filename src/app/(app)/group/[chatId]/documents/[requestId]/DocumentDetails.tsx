@@ -27,11 +27,17 @@ export default function DocumentDetails() {
   const { markAlertRead } = useNotifications();
   const supabase = useMemo(() => createClient(), []);
   const [state, setState] = useState<State>({ status: "loading" });
+  // Your role in the group (the owner can cancel anyone's request; DMs have no owner).
+  const [role, setRole] = useState<string | null>(null);
   const markedRead = useRef(false);
   const scrolled = useRef(false);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase.rpc("document_request_details", { req: requestId });
+    const [{ data, error }, mine] = await Promise.all([
+      supabase.rpc("document_request_details", { req: requestId }),
+      supabase.rpc("my_group_role", { target: chatId }),
+    ]);
+    if (!mine.error) setRole((mine.data as string | null) ?? null);
     if (error) return setState((s) => (s.status === "ready" ? s : { status: "error" }));
     if (!data) return setState({ status: "missing" });
     setState({ status: "ready", request: data as Details });
@@ -40,7 +46,7 @@ export default function DocumentDetails() {
       markedRead.current = true;
       markAlertRead(alertKey.document(requestId));
     }
-  }, [supabase, requestId, markAlertRead]);
+  }, [supabase, requestId, chatId, markAlertRead]);
 
   // Live: someone uploads, the requester reviews, or the request closes.
   useEffect(() => {
@@ -95,6 +101,7 @@ export default function DocumentDetails() {
   const iAsked = r.created_by === me;
   const mine = r.people.find((p) => p.user_id === me) ?? null;
   const open = r.status === "open";
+  const canCancel = open && (iAsked || role === "owner");
   const due = dueLabel(r.due_date);
   const requester = r.creator ? (r.creator.user_id === me ? "you" : r.creator.first_name) : "a former member";
   const created = new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -154,7 +161,7 @@ export default function DocumentDetails() {
               )}
             </div>
           </div>
-          {iAsked && open && <CancelRequest requestId={r.id} onDone={load} />}
+          {canCancel && <CancelRequest requestId={r.id} asOwner={!iAsked} onDone={load} />}
         </section>
 
         {/* 2. Your part */}
@@ -178,7 +185,7 @@ export default function DocumentDetails() {
             </div>
             <p className="mt-3 rounded-2xl bg-tint px-4 py-3 text-sm text-ink">
               {r.status === "cancelled"
-                ? "You canceled this request. Files already sent stay here for you and the person who sent them."
+                ? "This request was canceled. Files already sent stay here for you and the person who sent them."
                 : r.status === "complete"
                   ? "Everyone has been handled. Nothing left to review."
                   : r.waiting_count
@@ -361,8 +368,8 @@ function RequestId({ id }: { id: string }) {
   );
 }
 
-/** Cancel Request (the requester), with a confirmation. Files already sent stay private. */
-function CancelRequest({ requestId, onDone }: { requestId: string; onDone: () => void }) {
+/** Cancel Request (the requester or the group owner), with a confirmation. Files already sent stay private. */
+function CancelRequest({ requestId, asOwner, onDone }: { requestId: string; asOwner: boolean; onDone: () => void }) {
   const supabase = useMemo(() => createClient(), []);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -383,7 +390,11 @@ function CancelRequest({ requestId, onDone }: { requestId: string; onDone: () =>
   return (
     <div role="alertdialog" aria-label="Cancel this request?" className="mt-4 rounded-2xl bg-butter p-4">
       <p className="text-sm font-bold text-honey">Cancel this request for everyone?</p>
-      <p className="mt-0.5 text-[13px] text-ink">Nobody can upload to it any more. Files already sent stay here for you and whoever sent them.</p>
+      <p className="mt-0.5 text-[13px] text-ink">
+        {asOwner
+          ? "As the group owner you can cancel anyone's request. Nobody can upload to it any more, and files already sent stay private to the requester and whoever sent them."
+          : "Nobody can upload to it any more. Files already sent stay here for you and whoever sent them."}
+      </p>
       {problem && <p className="mt-1 text-[13px] font-semibold text-warn">{problem}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
         <button

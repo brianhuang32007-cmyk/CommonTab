@@ -205,7 +205,7 @@ Built 2026-11-10 (Brian's calls). Migration `20261110220000_document_requests.sq
   - **Everyone else:** the label and View Details only.
 - **Request page** (`/group/<chat>/documents/<request>`): header (status Open / Complete / Canceled, title, Request ID with Copy, type, due date, who asked, instructions), your part, **Who's sending** (each person's status), what's been sent, and **Activity**.
   - **People asked:** upload up to **5 files** at once (**Attach a File** or **Take a Photo**; PDF, photos, Word, Excel, PowerPoint, CSV or text; **15 MB each**), an optional note, optional **AI Verify** before sending, then **Submit Document**. **Replace File** works until it's reviewed. After a rejection they see the reason and upload again. **Can't Provide** (with a required reason) is there before sending or after a rejection.
-  - **The requester:** each upload with its files (open in the viewer), the note, **AI Verify**, and **Accept** or **Reject** (with a required reason). **Cancel Request** (confirm first; files already sent stay for the two people). Replaced uploads sit under "Earlier uploads".
+  - **The requester:** each upload with its files (open in the viewer), the note, **AI Verify**, and **Accept** or **Reject** (with a required reason). **Cancel Request** (confirm first; files already sent stay for the two people). The **group owner** can cancel anyone's request too (Brian's call, 2026-11-10; migration `20261110230000_owner_cancel_document.sql`). Replaced uploads sit under "Earlier uploads".
 - **Statuses** per person: `Requested → Ready to review (submitted) → Accepted`, or `Rejected` (upload again) or `Can't provide`. The request is **Complete** when everyone is accepted or can't provide.
 - **Files** live in CommonTab's own private storage (bucket `request-documents`, path `<request>/<uploader>/<upload>/<file>`). **Only the requester and the person who uploaded a file can open it**; the group sees statuses only. Drafts (not sent yet) are only the uploader's.
 - **File viewer** (`…/documents/<request>/files/<file>`): CommonTab's own viewer on its own page, with **Download**, the file name, who sent it and when, and arrows between files in the same upload.
@@ -321,5 +321,5 @@ Open questions:
 - Payment requests: can either person request a payment in a DM (hidden there for now)? Can a request be edited after it's sent? Should the request total change when a dispute changes or waives a share?
 - Disputes: files in the dispute chat, and alerts for new dispute messages and proposals?
 - Payments: save the payment note and the payer's handle so the requester sees them?
-- Document requests: can a request be edited after it's sent (add people, change the due date)? Should the group owner be able to cancel someone else's request?
+- Document requests: can a request be edited after it's sent (add people, change the due date)?
 - What's the scope of "AI helps fill out documents," and is it in the MVP?
