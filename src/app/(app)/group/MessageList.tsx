@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
-import { CardIcon, FileIcon } from "@/components/app/icons";
+import { CardIcon, CloseIcon, FileIcon } from "@/components/app/icons";
 import { signedLinks } from "@/lib/signedLinks";
 import type { createClient } from "@/lib/supabase/client";
 import { fileSize, type Attachment, type DraftFile, type MessagesState, type Outgoing } from "./messages";
@@ -510,6 +510,17 @@ function RequestCard({
         <CardIcon className="h-[18px] w-[18px] text-ink" />
         <p className="flex-1 text-[11px] font-bold tracking-[0.14em] text-ink uppercase">Payment request</p>
         <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${chip.className}`}>{chip.text}</span>
+        {canDelete && (
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            aria-label="Delete this request"
+            title="Delete this request"
+            className="-mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink hover:bg-white/70"
+          >
+            <CloseIcon className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <div className="px-4 pt-3">
@@ -619,17 +630,7 @@ function RequestCard({
               </button>
             </div>
           </div>
-        ) : (
-          <div className="-mt-1 px-4 pb-3 text-center">
-            <button
-              type="button"
-              onClick={() => setConfirming(true)}
-              className="h-9 px-2 text-[13px] font-bold text-muted underline hover:text-ink"
-            >
-              Delete request
-            </button>
-          </div>
-        ))}
+        ) : null)}
     </div>
   );
 }
