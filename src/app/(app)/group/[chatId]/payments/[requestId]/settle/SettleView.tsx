@@ -69,6 +69,7 @@ export default function SettleView() {
       status={request.my_share_status}
       payee={request.payee}
       payerHandles={{ venmo, paypal, zelle }}
+      handlesHref="/preferences#payment-handles"
       paid={paid}
       backHref={back}
       chatHref={chat}

@@ -46,8 +46,8 @@ export default function DemoSettle() {
       <div className="mx-auto max-w-[1100px]">
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-butter-strong px-4 py-3">
           <p className="min-w-0 flex-1 text-sm text-[#5C4A0B]">
-            <span className="font-bold">Local demo.</span> Made-up people, no sign-in, nothing saved, no real money. Reload or reset to
-            start over.
+            <span className="font-bold">Local demo.</span> Made-up people, no sign-in, nothing saved, no real money. Jordan&apos;s account
+            has Venmo and Zelle, so only those show. Reload or reset to start over.
           </p>
           <button
             type="button"
@@ -72,7 +72,8 @@ export default function DemoSettle() {
               status={status}
               payee={PAYEE}
               paid={paid}
-              payerHandles={{ venmo: "jordan-demo", paypal: null, zelle: null }}
+              payerHandles={{ venmo: "jordan-demo", paypal: null, zelle: "+15559876543" }}
+              handlesHref="/demo/settle"
               backHref="/demo/settle"
               chatHref="/demo/settle"
               onConfirm={async () => {
