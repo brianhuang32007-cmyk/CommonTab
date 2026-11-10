@@ -213,8 +213,8 @@ Each step is something we build together, review, then commit.
 | | 3 | Preferences and Profile: edit profile, photo and payment handles, reminders, privacy, account **(done)** |
 | | 4 | Navigation bar with the tabs (placeholder pages) |
 | 2. Social | 5 | Contacts: add friends by username, friends list **(built; live test pending)** |
-| | 6 | Groups: create a group, invite friends, roles |
-| | 7 | Real-time chat and direct messages |
+| | 6 | Groups: create a group, invite friends, roles **(current)** |
+| | 7 | Real-time chat and direct messages **(current)** |
 | | 8 | @tagging in chat |
 | 3. Money | 9 | Payment requests with equal and custom splits |
 | | 10 | Confirm, dispute and dispute threads |
@@ -233,9 +233,17 @@ Steps 1, 2 and 3 are done and live (last update: 2026-11-10). The app frame is a
 
 **Step 3 (Preferences and Profile) is done and live.** The app frame already covers most of Step 4 (navigation).
 
-**Current: Step 5, Contacts, is built** (migration `20261110010000_contacts.sql` has been run). Username search (top 10, prefix first), requests that must be accepted, contacts list (starred first, then A to Z; 12 visible, then scroll), private stars, a profile pop-up (handles, phone if shared, groups in common once Groups exist), and live updates through Supabase Realtime, including a request badge on Contacts in the sidebar. Default profile pictures are initials on a soft color picked from the account (`src/components/Avatar.tsx`). Still to do: a live test with two accounts. Wait for Brian's instructions before starting the next step.
+**Step 5, Contacts, is built and live** (migration `20261110010000_contacts.sql` has been run). Username search (top 10, prefix first), requests that must be accepted, contacts list (starred first, then A to Z; 12 visible, then scroll), private stars, a profile pop-up (handles, phone if shared, groups in common) and live updates through Supabase Realtime. The alert bell (migration `20261110020000_notifications.sql`) shows new contact requests on every page. Default profile pictures are initials on a soft color picked from the account (`src/components/Avatar.tsx`). A live test with two accounts is still to do.
+
+**Current: Steps 6 and 7, Groups and chats.** Build them together, one piece at a time, and plan each piece with Brian before writing code. Pieces already waiting for them:
+- `/group` is a "Coming soon" placeholder.
+- The Contacts message icon and the profile pop-up's Message button link to `/group?dm=<username>`.
+- The profile pop-up's "Groups in common" list is empty until groups exist (2 visible, then scroll).
+- `Avatar` has `shape="square"` for group pictures.
+- Invites come only from your contacts. Chat uses Supabase Realtime, the same way Contacts does.
 
 Open questions:
 - CLAUDE.md and the planning doc disagree in places (5 vs 6 tabs, Settings, Steps 13/15, whose Zelle handle the button shows). Brian hasn't said which is current; the Google Doc also still says "magic link".
+- Groups: does an invite need to be accepted, or does it add the person right away? Can members invite, or only organizers? Can a group have more than one organizer, and what happens when the organizer leaves?
 - Can any member create payment requests, or only organizers?
 - What's the scope of "AI helps fill out documents," and is it in the MVP?

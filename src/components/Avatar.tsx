@@ -13,6 +13,19 @@ const COLORS: [bg: string, fg: string][] = [
   ["#D5EBE6", "#1D4F47"], // teal
 ];
 
+// Groups without a picture: soft two-color gradients, each with dark text that passes 4.5:1
+// on both ends. The group's index (0–7) is picked at random when it's created.
+export const GROUP_GRADIENTS: [from: string, to: string, fg: string][] = [
+  ["#CDE7D3", "#D9E4EE", "#1F4D33"], // mint → sky
+  ["#FBF0C9", "#F8E1CF", "#5C4A0B"], // butter → peach
+  ["#F3F6E2", "#CDE7D3", "#1F4D33"], // lime → mint
+  ["#D9E4EE", "#E2DDF1", "#23425E"], // sky → lavender
+  ["#EBDDE6", "#F8E1CF", "#5E2A47"], // rose → peach
+  ["#D5EBE6", "#F3F6E2", "#1D4F47"], // teal → lime
+  ["#E2DDF1", "#EBDDE6", "#3D3170"], // lavender → rose
+  ["#F8E1CF", "#FBF0C9", "#6B3510"], // peach → butter
+];
+
 function colorFor(seed: string) {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
@@ -35,6 +48,7 @@ export default function Avatar({
   size = 40,
   alt = "",
   shape = "circle",
+  gradient = null,
 }: {
   src?: string | null;
   /** Full name, used for the initials. */
@@ -45,6 +59,8 @@ export default function Avatar({
   alt?: string;
   /** circle for people, square (rounded corners) for groups */
   shape?: "circle" | "square";
+  /** Groups: which of GROUP_GRADIENTS to use when there's no picture. */
+  gradient?: number | null;
 }) {
   const round = shape === "square" ? "rounded-[28%]" : "rounded-full";
   if (src) {
@@ -62,7 +78,8 @@ export default function Avatar({
   }
 
   const initials = initialsOf(name);
-  const [bg, fg] = colorFor(String(seed ?? name));
+  const grad = gradient != null ? GROUP_GRADIENTS[((gradient % 8) + 8) % 8] : null;
+  const [bg, fg] = grad ? [`linear-gradient(135deg, ${grad[0]}, ${grad[1]})`, grad[2]] : colorFor(String(seed ?? name));
   return (
     <span
       role={alt ? "img" : undefined}

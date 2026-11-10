@@ -16,6 +16,7 @@ export default function AppShell({ profile, children }: { profile: AppProfile; c
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => setMenuOpen(false);
+  const onDashboard = pathname === "/dashboard";
 
   return (
     <ProfileProvider value={profile}>
@@ -77,15 +78,16 @@ export default function AppShell({ profile, children }: { profile: AppProfile; c
             )}
           </div>
 
-          <div className="mx-auto w-full max-w-[1240px] px-4 pb-24 sm:px-8">
+          {/* Only the dashboard keeps room at the bottom for the AI button; other pages run to the bottom. */}
+          <div className={`mx-auto w-full max-w-[1240px] px-4 sm:px-8 ${onDashboard ? "pb-24" : "pb-6"}`}>
             <TopBar />
             <main className="pt-6">{children}</main>
           </div>
         </div>
       </div>
 
-      {/* CommonTab AI shortcut (hidden on the AI page itself) */}
-      {pathname !== "/ai" && (
+      {/* CommonTab AI shortcut, on the dashboard only */}
+      {onDashboard && (
         <Link
           href="/ai"
           className="fixed bottom-5 right-5 z-20 flex h-[52px] items-center gap-2 rounded-full bg-brand px-5 font-bold text-white shadow-lg shadow-night/20 transition hover:bg-brand-hover"
