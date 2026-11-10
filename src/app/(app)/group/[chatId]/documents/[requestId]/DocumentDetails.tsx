@@ -11,7 +11,7 @@ import { alertKey } from "@/lib/notificationReads";
 import { createClient } from "@/lib/supabase/client";
 import { DOC_STATUS, docRef, docTypeLabel, type DocEvent, type DocumentDetails as Details } from "../../../documents";
 import { dueLabel } from "../../../requests";
-import { CantProvide, ReasonBox, SenderUpload, UploadCard } from "./parts";
+import { AiBadge, CantProvide, ReasonBox, SenderUpload, UploadCard } from "./parts";
 
 // A document request's page. It adapts to who's looking: the requester sees who has sent
 // what, opens the files, runs AI Verify if they want, and accepts or rejects each upload.
@@ -189,7 +189,7 @@ export default function DocumentDetails() {
                 : r.status === "complete"
                   ? "Everyone has been handled. Nothing left to review."
                   : r.waiting_count
-                    ? `${r.waiting_count === 1 ? "1 document is" : `${r.waiting_count} documents are`} waiting for your review below. Open the files, run AI Verify if you like, then accept or reject.`
+                    ? `${r.waiting_count === 1 ? "1 document is" : `${r.waiting_count} documents are`} waiting for your review below. Run AI Verify, or open the files to check them yourself, then accept or reject.`
                     : "Waiting for people to send their documents. You'll get an alert when one arrives."}
             </p>
           </section>
@@ -239,6 +239,8 @@ export default function DocumentDetails() {
                       <span className="truncate font-bold">{p.user_id === me ? "You" : `${p.first_name} ${p.last_name}`}</span>
                       <span className="truncate text-[13px] text-muted">@{p.username}</span>
                     </span>
+                    {/* The AI result on their latest upload (only the requester and that person see uploads). */}
+                    <AiBadge status={current.find((u) => u.user_id === p.user_id)?.ai_status ?? null} />
                     <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-center text-xs font-bold ${st.className}`}>{st.label}</span>
                   </div>
                   {iAsked && p.reason && (p.status === "rejected" || p.status === "cant_provide") && (
@@ -267,6 +269,7 @@ export default function DocumentDetails() {
                   requestId={r.id}
                   who={nameOf(u.user_id)}
                   canReview={iAsked && open && u.status === "submitted"}
+                  canVerify={open && u.status === "submitted" && (iAsked || u.user_id === me)}
                   onChanged={load}
                 />
               ))}
@@ -278,7 +281,16 @@ export default function DocumentDetails() {
                 </summary>
                 <div className="flex flex-col gap-3 pb-2">
                   {earlier.map((u) => (
-                    <UploadCard key={u.id} upload={u} chatId={r.conversation_id} requestId={r.id} who={nameOf(u.user_id)} canReview={false} onChanged={load} />
+                    <UploadCard
+                      key={u.id}
+                      upload={u}
+                      chatId={r.conversation_id}
+                      requestId={r.id}
+                      who={nameOf(u.user_id)}
+                      canReview={false}
+                      canVerify={false}
+                      onChanged={load}
+                    />
                   ))}
                 </div>
               </details>

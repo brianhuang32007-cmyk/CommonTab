@@ -35,7 +35,16 @@ export type DocumentRequestRow = DocumentRequestView & {
   requester_last_name: string | null;
 };
 
-export type DocFile = { id: string; path: string; name: string; mime_type: string; size_bytes: number; position: number };
+export type DocFile = {
+  id: string;
+  path: string;
+  name: string;
+  mime_type: string;
+  size_bytes: number;
+  position: number;
+  /** You've opened it in the viewer (missing before migration 20261110240000). */
+  viewed?: boolean;
+};
 
 /** What AI Verify found (the AI reads and suggests; the requester decides). */
 export type AiCheckResult = {
@@ -44,6 +53,8 @@ export type AiCheckResult = {
   looks_like: string | null;
   key_details: { label: string; value: string }[];
   summary: string;
+  /** The document's important text, as the AI read it. */
+  transcript?: string | null;
   /** Files the AI couldn't read (e.g. an old .doc). */
   skipped?: string[];
 };
@@ -58,8 +69,12 @@ export type DocUpload = {
   reviewed_at: string | null;
   review_note: string | null;
   files: DocFile[];
-  /** Your own AI Verify result for this upload, if you ran it. */
-  ai_check: { result: AiCheckResult; model: string | null; created_at: string } | null;
+  /** The latest AI Verify result, shown to both the requester and the sender. */
+  ai_status?: "verified" | "failed" | null;
+  ai_result?: AiCheckResult | null;
+  ai_model?: string | null;
+  ai_checked_at?: string | null;
+  ai_checked_by?: string | null;
 };
 
 export type DocEvent = {

@@ -47,6 +47,8 @@ export default function FileViewer() {
       const url = links.get(file.path);
       if (!live) return;
       setState(url ? { status: "ready", file, url } : { status: "missing" });
+      // Opened: the requester has now checked this file (needed to accept one that isn't AI Verified).
+      if (url) supabase.rpc("mark_document_file_viewed", { target: file.id }).then(() => {});
     })();
     return () => {
       live = false;

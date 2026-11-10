@@ -96,7 +96,8 @@ function Uploader({
   const [note, setNote] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState<"verify" | "send" | null>(null);
-  const [check, setCheck] = useState<AiCheckResult | null>(null);
+  // The AI result for this draft (it's saved with the upload and goes with it when sent).
+  const [check, setCheck] = useState<{ result: AiCheckResult; status: "verified" | "failed" } | null>(null);
   const counter = useRef(0);
   const attach = useRef<HTMLInputElement>(null);
   const camera = useRef<HTMLInputElement>(null);
@@ -163,9 +164,9 @@ function Uploader({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ upload_id: uploadId }),
       });
-      const body = (await res.json().catch(() => ({}))) as { check?: AiCheckResult; error?: string };
+      const body = (await res.json().catch(() => ({}))) as { check?: AiCheckResult; status?: "verified" | "failed"; error?: string };
       if (!res.ok || !body.check) throw new Error(body.error ?? "AI Verify couldn't check this right now.");
-      setCheck(body.check);
+      setCheck({ result: body.check, status: body.status ?? "failed" });
     } catch (e) {
       setProblem(e instanceof Error ? e.message : "AI Verify couldn't check this right now.");
     }
@@ -297,7 +298,7 @@ function Uploader({
         />
       </label>
 
-      {check && <AiResult check={check} />}
+      {check && <AiResult check={check.result} status={check.status} />}
 
       {problem && (
         <p role="alert" className="rounded-xl bg-butter px-3.5 py-2.5 text-sm font-semibold text-honey">
@@ -323,7 +324,7 @@ function Uploader({
           type="button"
           onClick={verify}
           disabled={!ready || busy !== null}
-          title="Optional: check it matches the request before you send it"
+          title="Optional: AI checks it matches the request before you send it (you can also run it after sending)"
           className="flex h-12 items-center gap-2 rounded-xl border border-line bg-white px-4 text-sm font-bold text-ink hover:bg-tint disabled:opacity-50"
         >
           <BoltIcon className="h-4 w-4 text-brand" />
@@ -427,29 +428,52 @@ const UPLOAD_STATUS: Record<DocUpload["status"], { label: string; className: str
   replaced: { label: "Replaced", className: "bg-mist text-muted" },
 };
 
+/** The small badge on an upload: AI Verified, or AI Verification Failed. */
+export function AiBadge({ status }: { status: DocUpload["ai_status"] }) {
+  if (status === "verified") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-brand px-2.5 py-0.5 text-xs font-bold text-white">
+        <CheckIcon className="h-3.5 w-3.5" />
+        AI Verified
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return <span className="inline-flex items-center gap-1 rounded-full bg-butter px-2.5 py-0.5 text-xs font-bold text-honey">AI Verification Failed</span>;
+  }
+  return null;
+}
+
 export function UploadCard({
   upload,
   chatId,
   requestId,
   who,
   canReview,
+  canVerify,
   onChanged,
 }: {
   upload: DocUpload;
   chatId: string;
   requestId: string;
   who: string;
+  /** The requester, while it waits for review: Accept and Reject. */
   canReview: boolean;
+  /** The requester or the person who sent it, while it waits for review: AI Verify. */
+  canVerify: boolean;
   onChanged: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
-  const [check, setCheck] = useState<AiCheckResult | null>(upload.ai_check?.result ?? null);
   const [verifying, setVerifying] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const st = UPLOAD_STATUS[upload.status];
+  const verified = upload.ai_status === "verified";
+  const unopened = upload.files.filter((f) => !f.viewed);
+  // Not AI Verified: open every file before accepting (the database checks this too).
+  const mustOpen = canReview && !verified && unopened.length > 0;
 
   async function verify() {
     setVerifying(true);
@@ -460,9 +484,9 @@ export function UploadCard({
       body: JSON.stringify({ upload_id: upload.id }),
     }).catch(() => null);
     const body = res ? ((await res.json().catch(() => ({}))) as { check?: AiCheckResult; error?: string }) : {};
-    if (res?.ok && body.check) setCheck(body.check);
-    else setProblem(body.error ?? "AI Verify couldn't check this right now. You can still review it yourself.");
     setVerifying(false);
+    if (res?.ok && body.check) onChanged(); // the saved result shows for both people
+    else setProblem(body.error ?? "AI Verify couldn't check this right now. Check it yourself instead.");
   }
 
   async function review(decision: "accept" | "reject") {
@@ -488,6 +512,7 @@ export function UploadCard({
           {who === "You" ? "You sent" : `${who} sent`}{" "}
           <span className="font-medium text-muted">· {stamp(upload.submitted_at ?? upload.created_at)}</span>
         </p>
+        <AiBadge status={upload.ai_status} />
         <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${st.className}`}>{st.label}</span>
       </div>
       {upload.note && <p className="mt-1.5 rounded-xl bg-mist px-3 py-2 text-sm whitespace-pre-wrap text-ink">{upload.note}</p>}
@@ -503,6 +528,7 @@ export function UploadCard({
                 <span className="block truncate text-sm font-bold">{f.name}</span>
                 <span className="block text-[13px] text-muted">
                   {fileKindLabel(f)} · {fileSize(f.size_bytes)}
+                  {canReview && (f.viewed ? " · Opened" : " · Not opened yet")}
                 </span>
               </span>
               <span className="shrink-0 text-sm font-bold text-brand">Open</span>
@@ -513,7 +539,7 @@ export function UploadCard({
 
       {upload.status === "rejected" && upload.review_note && <ReasonBox title="Rejected because" text={upload.review_note} />}
 
-      {check && <AiResult check={check} />}
+      {upload.ai_result && upload.ai_status && <AiResult check={upload.ai_result} status={upload.ai_status} />}
 
       {problem && (
         <p role="alert" className="mt-3 rounded-xl bg-butter px-3.5 py-2.5 text-sm font-semibold text-honey">
@@ -521,22 +547,23 @@ export function UploadCard({
         </p>
       )}
 
-      {/* The requester can run AI Verify on what was sent (the uploader runs it before sending). */}
-      {canReview && (
+      {(canVerify || canReview) && !rejecting && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={verify}
-            disabled={verifying || busy}
-            title="Optional: AI checks it matches the request, pulls out key details and summarizes it"
-            className="flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-4 text-sm font-bold text-ink hover:bg-tint disabled:opacity-50"
-          >
-            <BoltIcon className="h-4 w-4 text-brand" />
-            {verifying ? "Checking…" : check ? "Check Again" : "AI Verify"}
-          </button>
-          {!rejecting && (
+          {canVerify && (
+            <button
+              type="button"
+              onClick={verify}
+              disabled={verifying || busy}
+              title="AI checks it matches the request, pulls out the key details and summarizes it"
+              className="flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-4 text-sm font-bold text-ink hover:bg-tint disabled:opacity-50"
+            >
+              <BoltIcon className="h-4 w-4 text-brand" />
+              {verifying ? "Checking…" : upload.ai_status ? "Check Again" : "AI Verify"}
+            </button>
+          )}
+          {canReview && (
             <>
-              <span className="mr-auto hidden text-[13px] text-muted sm:inline">Or review it yourself.</span>
+              <span className="mr-auto" />
               <button
                 type="button"
                 onClick={() => setRejecting(true)}
@@ -548,7 +575,8 @@ export function UploadCard({
               <button
                 type="button"
                 onClick={() => review("accept")}
-                disabled={busy}
+                disabled={busy || mustOpen}
+                title={mustOpen ? "Open each file to check it first" : undefined}
                 className="flex h-11 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-bold text-white hover:bg-brand-hover disabled:opacity-50"
               >
                 <CheckIcon className="h-4 w-4" />
@@ -557,6 +585,13 @@ export function UploadCard({
             </>
           )}
         </div>
+      )}
+      {mustOpen && !rejecting && (
+        <p className="mt-2 text-[13px] text-muted">
+          {upload.ai_status === "failed" ? "AI couldn't verify it. " : "It isn't AI Verified. "}
+          Open {upload.files.length === 1 ? "the file" : unopened.length === upload.files.length ? "each file" : "the rest of the files"} to check{" "}
+          {upload.files.length === 1 ? "it" : "them"} yourself before accepting.
+        </p>
       )}
 
       {canReview && rejecting && (
@@ -602,25 +637,22 @@ export function UploadCard({
   );
 }
 
-/* ---------- AI Verify's result ---------- */
+/* ---------- AI Verify's result (shown to both the requester and the sender) ---------- */
 
-const VERDICT: Record<AiCheckResult["verdict"], { label: string; className: string }> = {
-  matches: { label: "Matches the request", className: "bg-tint text-brand" },
-  partial: { label: "Partly matches", className: "bg-butter-strong text-[#5C4A0B]" },
-  does_not_match: { label: "Doesn't look like what was asked", className: "bg-butter text-honey" },
-  unreadable: { label: "Couldn't read it", className: "bg-mist text-muted" },
-};
-
-export function AiResult({ check }: { check: AiCheckResult }) {
-  const v = VERDICT[check.verdict] ?? VERDICT.unreadable;
+export function AiResult({ check, status }: { check: AiCheckResult; status: "verified" | "failed" }) {
+  const ok = status === "verified";
   return (
-    <section aria-label="AI Verify result" className="mt-3 rounded-2xl border border-line bg-white">
-      <div className="flex flex-wrap items-center gap-2 rounded-t-2xl bg-tint px-4 py-2.5">
-        <BoltIcon className="h-4 w-4 text-brand" />
-        <p className="flex-1 text-[11px] font-bold tracking-[0.14em] text-ink uppercase">AI Verify</p>
-        <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${v.className === "bg-tint text-brand" ? "bg-white text-brand" : v.className}`}>
-          {v.label}
+    <section aria-label="AI Verify result" className={`mt-3 rounded-2xl border ${ok ? "border-brand/30" : "border-[#E0C266]"} bg-white`}>
+      <div className={`flex items-center gap-2.5 rounded-t-2xl px-4 py-3 ${ok ? "bg-tint" : "bg-butter"}`}>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${ok ? "bg-brand text-white" : "bg-white text-honey"}`}>
+          {ok ? <CheckIcon className="h-4 w-4" /> : <BoltIcon className="h-4 w-4" />}
         </span>
+        <div className="min-w-0 flex-1">
+          <p className={`font-extrabold ${ok ? "text-brand" : "text-honey"}`}>{ok ? "AI Verified Successful" : "AI Verification Failed"}</p>
+          <p className="text-[13px] text-ink">
+            {ok ? "It matches what was asked and has the info needed." : "Please check it manually instead."}
+          </p>
+        </div>
       </div>
       <div className="px-4 py-3">
         <p className="text-sm text-ink">{check.reason}</p>
@@ -644,6 +676,12 @@ export function AiResult({ check }: { check: AiCheckResult }) {
             <p className="mt-3 text-[11px] font-bold tracking-[0.14em] text-muted uppercase">Summary</p>
             <p className="mt-1 text-sm text-ink">{check.summary}</p>
           </>
+        )}
+        {check.transcript && (
+          <details className="mt-3 rounded-xl border border-line">
+            <summary className="flex min-h-11 cursor-pointer items-center px-3.5 text-sm font-bold text-ink">Transcript</summary>
+            <pre className="max-h-72 overflow-auto px-3.5 pb-3 text-[13px] leading-relaxed whitespace-pre-wrap text-ink">{check.transcript}</pre>
+          </details>
         )}
         {check.skipped?.length ? <p className="mt-2 text-[13px] text-muted">Couldn&apos;t read: {check.skipped.join(", ")}</p> : null}
         <p className="mt-3 text-[12px] text-muted">An AI check, not proof the document is genuine. The requester decides.</p>

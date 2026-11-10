@@ -6,11 +6,12 @@ import { looksLike } from "@/lib/aiFiles";
 import { createClient } from "@/lib/supabase/server";
 
 // AI Verify for a document request: checks whether an upload matches what was asked, pulls out
-// the important details and writes a short summary. Runs only when someone clicks it: the
-// requester, or the person uploading before they send. Server only, signed-in people only, 20
-// checks per person in any 24 hours, every check logged. The files are read here with the
-// person's own session, so storage only hands over files they're allowed to open. The AI reads
-// and suggests; the requester decides.
+// the important details, writes a short summary and a transcript. Runs only when someone clicks
+// it: the person who sent it (before or after sending) or the requester. Server only, signed-in
+// people only, 20 checks per person in any 24 hours, every check logged. The files are read here
+// with the person's own session, so storage only hands over files they're allowed to open. The
+// result is saved on the upload for both people to see; only this server can save it (it proves
+// it with AI_VERIFY_SECRET). The AI reads and suggests; the requester decides.
 
 export const maxDuration = 60;
 
@@ -27,6 +28,10 @@ const Check = z.object({
     .max(15)
     .describe("The most important facts as printed (e.g. Vendor, Date, Period, Total, Items, Signed by). Never invent a value"),
   summary: z.string().describe("A short summary (2 to 4 sentences) of what the document contains"),
+  transcript: z
+    .string()
+    .nullable()
+    .describe("The document's important text as written (headings, lines, amounts), at most about 3000 characters; null if unreadable"),
 });
 
 type Input = { name: string; mime_type: string; size_bytes: number; path: string };
@@ -78,7 +83,8 @@ export async function POST(request: Request) {
 
   const model = process.env.AI_MODEL_DEFAULT;
   const backup = process.env.AI_MODEL_FALLBACK;
-  if (!model) return fail(503, "AI Verify isn't set up yet. You can still review the document yourself.");
+  const secret = process.env.AI_VERIFY_SECRET;
+  if (!model || !secret) return fail(503, "AI Verify isn't set up yet. You can still review the document yourself.");
 
   // Read the files with the person's own access (storage checks who may open them).
   const parts: (TextPart | FilePart)[] = [];
@@ -154,7 +160,8 @@ export async function POST(request: Request) {
         },
       ],
     });
-    const check = { ...result.output, ...(skipped.length ? { skipped } : {}) };
+    const output = result.output;
+    const check = { ...output, transcript: output.transcript?.slice(0, 6000) ?? null, ...(skipped.length ? { skipped } : {}) };
     const modelUsed = result.response?.modelId ?? model;
     await supabase.rpc("finish_ai_call", {
       call_id: callId,
@@ -164,8 +171,19 @@ export async function POST(request: Request) {
       tokens_out: result.totalUsage?.outputTokens ?? null,
       problem: null,
     });
-    await supabase.rpc("save_document_ai_check", { target: uploadId, check_result: check, model_used: modelUsed });
-    return Response.json({ check, model: modelUsed }, { headers: { "Cache-Control": "no-store" } });
+    const saved = await supabase.rpc("record_document_ai_check", {
+      target: uploadId,
+      check_result: check,
+      verdict: check.verdict,
+      model_used: modelUsed,
+      route_secret: secret,
+    });
+    if (saved.error) {
+      console.error("AI Verify save error:", saved.error.message);
+      return fail(409, "AI Verify checked it but couldn't save the result. Try again, or review it yourself.");
+    }
+    const status = check.verdict === "matches" ? "verified" : "failed";
+    return Response.json({ check, status, model: modelUsed }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("AI Verify error:", error);
     await supabase.rpc("finish_ai_call", {
