@@ -1,4 +1,4 @@
-import { BoltIcon, ChatIcon, ContactsIcon, DocumentIcon, HomeIcon, SettingsIcon } from "./icons";
+import { BellIcon, BoltIcon, ChatIcon, ContactsIcon, DocumentIcon, HomeIcon, SettingsIcon } from "./icons";
 
 // The app's pages, in sidebar order. Titles also appear in the top bar.
 export const MENU = [
@@ -6,7 +6,8 @@ export const MENU = [
   { href: "/group", label: "Group", icon: ChatIcon },
   { href: "/contacts", label: "Contacts", icon: ContactsIcon },
   { href: "/ai", label: "CommonTab AI", icon: BoltIcon, badge: "NEW" },
-  { href: "/documents", label: "Documents & Receipts", icon: DocumentIcon },
+  { href: "/documents", label: "Document Drafting", icon: DocumentIcon },
+  { href: "/notifications", label: "Notifications & Reminders", icon: BellIcon },
 ] as const;
 
 export const PREFERENCES = [{ href: "/preferences", label: "Preferences", icon: SettingsIcon }] as const;

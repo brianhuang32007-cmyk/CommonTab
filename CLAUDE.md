@@ -89,7 +89,7 @@ Rules:
 **Type and shapes:** Plus Jakarta Sans. Page titles 28–32px ExtraBold (800); card titles 18–20px ExtraBold; body 14–16px; small labels 11–12px Bold, uppercase with wide letter spacing. Cards are white with a 1px `line` border and 20–24px corners; buttons and inputs are 44–52px tall with 10–14px corners; badges and chips are fully rounded. Touch targets at least 44px.
 
 **Layout and names:**
-- **Desktop:** left sidebar with the logo; **Menu** (Dashboard, Group, Contacts, CommonTab AI, Documents & Receipts) and **Preferences** (Preferences, Log out); payment handles box (all three providers with their logos; missing ones show an underlined **Add handle** link) and profile card at the bottom. The profile card opens the **Profile** page. Top bar: page title on the left, a large live clock with the date in the center, the **notification bell** on the right, on every page (on phones it sits in the header). The bell opens a fixed-size (380×440) drop-down of recent notifications that scrolls when full; for now notifications are only new contact requests, with Accept and Decline. Unread ones show a red count on the bell.
+- **Desktop:** left sidebar with the logo; **Menu** (Dashboard, Group, Contacts, CommonTab AI, Document Drafting, Notifications & Reminders) and **Preferences** (Preferences, Log out); payment handles box (all three providers with their logos; missing ones show an underlined **Add handle** link) and profile card at the bottom. The profile card opens the **Profile** page. Top bar: page title on the left, a large live clock with the date in the center, the **notification bell** on the right, on every page (on phones it sits in the header). The bell opens a fixed-size (380×440) drop-down of recent notifications that scrolls when full; for now notifications are only new contact requests, with Accept and Decline. Unread ones show a red count on the bell.
 - **Phone:** top bar with logo mark, title, action icon and profile photo (opens Profile); bottom tabs Home, Group, Contacts, AI, Docs.
 - **CommonTab AI** always uses the lightning-bolt icon and can be collapsed to an "Ask CommonTab AI" button. It drafts and suggests; the user taps to send.
 - Button labels use Title Case for main actions: **Add Contact**, **Create Group**.
@@ -106,7 +106,8 @@ Rules:
 | **Group** | Group chats and direct messages, where requests get tagged |
 | **Contacts** | Friends list, adding friends by username |
 | **CommonTab AI** | The AI chatbot (lightning icon) |
-| **Documents & Receipts** | The AI drafting tool (see section 7) |
+| **Document Drafting** (`/documents`) | The AI drafting tool (see section 7) |
+| **Notifications & Reminders** (`/notifications`) | All notifications (contact requests for now) and payment reminders. The bell shows the recent ones. |
 | **Preferences** | Profile summary with **Edit Profile** (opens the separate **Profile** page), payment handles, reminders, privacy, account. |
 | **Profile** (`/profile`) | Edit photo, name, username, phone and birthday. Opened from Edit Profile or the sidebar's profile card. |
 
@@ -228,7 +229,7 @@ Each step is something we build together, review, then commit.
 
 ## Current step
 
-Steps 1, 2 and 3 are done and live (last update: 2026-11-10). The app frame is also built: every signed-in page shares `src/app/(app)/layout.tsx` (sidebar, top bar with live clock, phone drop-down menu). The dashboard shows the approved design with empty data; Group, Contacts, CommonTab AI and Documents & Receipts are "Coming soon" placeholders.
+Steps 1, 2 and 3 are done and live (last update: 2026-11-10). The app frame is also built: every signed-in page shares `src/app/(app)/layout.tsx` (sidebar, top bar with live clock, phone drop-down menu). The dashboard shows the approved design with empty data; Group, CommonTab AI, Document Drafting and Notifications & Reminders are "Coming soon" placeholders.
 
 **Step 3 (Preferences and Profile) is done and live.** The app frame already covers most of Step 4 (navigation).
 
