@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
-import { CheckIcon, ChevronLeftIcon, FileIcon } from "@/components/app/icons";
+import { CheckIcon, ChevronLeftIcon, CloseIcon, FileIcon } from "@/components/app/icons";
 import { useNotifications } from "@/components/app/NotificationsContext";
 import { useProfile } from "@/components/app/ProfileContext";
 import { alertKey } from "@/lib/notificationReads";
@@ -160,8 +160,8 @@ export default function DocumentDetails() {
                 </div>
               )}
             </div>
+            {canCancel && <CancelButton requestId={r.id} asOwner={!iAsked} onDone={load} />}
           </div>
-          {canCancel && <CancelRequest requestId={r.id} asOwner={!iAsked} onDone={load} />}
         </section>
 
         {/* 2. Your part */}
@@ -368,35 +368,35 @@ function RequestId({ id }: { id: string }) {
   );
 }
 
-/** Cancel Request (the requester or the group owner), with a confirmation. Files already sent stay private. */
-function CancelRequest({ requestId, asOwner, onDone }: { requestId: string; asOwner: boolean; onDone: () => void }) {
+/** × at the top: cancel the request (the requester or the group owner), with a confirmation.
+ *  Files already sent stay private to the requester and whoever sent them. */
+function CancelButton({ requestId, asOwner, onDone }: { requestId: string; asOwner: boolean; onDone: () => void }) {
   const supabase = useMemo(() => createClient(), []);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+
   if (!confirming) {
     return (
-      <div className="mt-4 flex justify-end border-t border-line pt-4">
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          className="h-11 rounded-xl border border-line bg-white px-4 text-sm font-bold text-ink hover:bg-mist"
-        >
-          Cancel Request
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        aria-label="Cancel this request"
+        title="Cancel this request"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-mist hover:text-ink"
+      >
+        <CloseIcon className="h-5 w-5" />
+      </button>
     );
   }
   return (
-    <div role="alertdialog" aria-label="Cancel this request?" className="mt-4 rounded-2xl bg-butter p-4">
+    <div role="alertdialog" aria-label="Cancel this request?" className="w-full max-w-[260px] shrink-0 rounded-xl bg-butter p-3">
       <p className="text-sm font-bold text-honey">Cancel this request for everyone?</p>
       <p className="mt-0.5 text-[13px] text-ink">
-        {asOwner
-          ? "As the group owner you can cancel anyone's request. Nobody can upload to it any more, and files already sent stay private to the requester and whoever sent them."
-          : "Nobody can upload to it any more. Files already sent stay here for you and whoever sent them."}
+        {asOwner ? "As the group owner you can cancel anyone's request. " : ""}Nobody can upload to it any more. Files already sent stay private.
       </p>
       {problem && <p className="mt-1 text-[13px] font-semibold text-warn">{problem}</p>}
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-2.5 flex gap-2">
         <button
           type="button"
           autoFocus
@@ -412,17 +412,17 @@ function CancelRequest({ requestId, asOwner, onDone }: { requestId: string; asOw
               onDone();
             }
           }}
-          className="h-11 rounded-xl bg-ink px-4 text-sm font-bold text-white hover:bg-black disabled:opacity-60"
+          className="h-10 rounded-lg bg-ink px-3.5 text-sm font-bold text-white hover:bg-black disabled:opacity-60"
         >
-          {busy ? "Canceling…" : "Yes, Cancel Request"}
+          {busy ? "Canceling…" : "Yes, Cancel"}
         </button>
         <button
           type="button"
           disabled={busy}
           onClick={() => setConfirming(false)}
-          className="h-11 rounded-xl border border-line bg-white px-4 text-sm font-bold disabled:opacity-60"
+          className="h-10 rounded-lg border border-line bg-white px-3.5 text-sm font-bold disabled:opacity-60"
         >
-          Keep It Open
+          Keep It
         </button>
       </div>
     </div>

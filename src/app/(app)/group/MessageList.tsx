@@ -232,6 +232,7 @@ export default function MessageList({
                     supabase={supabase}
                     onDrop={state.drop}
                     onRequestChanged={state.refreshRequest}
+                    onDocumentChanged={state.refreshDocument}
                   />
                 </Fragment>
               );
@@ -293,6 +294,7 @@ function Bubble({
   supabase,
   onDrop,
   onRequestChanged,
+  onDocumentChanged,
 }: {
   item: Item;
   mine: boolean;
@@ -309,6 +311,7 @@ function Bubble({
   supabase: ReturnType<typeof createClient>;
   onDrop: (messageId: string) => void;
   onRequestChanged: (requestId: string) => void;
+  onDocumentChanged: (requestId: string) => void;
 }) {
   const name = sender ? personName(sender) : "Former member";
   const o = item.outgoing;
@@ -340,7 +343,15 @@ function Bubble({
           />
         )}
 
-        {item.document && <DocumentCard request={item.document} me={me} members={members} />}
+        {item.document && (
+          <DocumentCard
+            request={item.document}
+            me={me}
+            members={members}
+            supabase={supabase}
+            onChanged={() => onDocumentChanged(item.document!.id)}
+          />
+        )}
 
         {item.body && !item.request && !item.document && (
           <p
@@ -755,8 +766,34 @@ function joinNames(names: string[]) {
 /** A document request in the chat: who is asking whom for what, and your next step.
  *  People asked: an Upload Document box (or where their upload stands). The requester: progress
  *  and a Review box when something is waiting. Everyone: View Details. */
-function DocumentCard({ request, me, members }: { request: DocumentRequestView; me: string; members: Map<string, Member> }) {
+function DocumentCard({
+  request,
+  me,
+  members,
+  supabase,
+  onChanged,
+}: {
+  request: DocumentRequestView;
+  me: string;
+  members: Map<string, Member>;
+  supabase: ReturnType<typeof createClient>;
+  onChanged: () => void;
+}) {
   const iAsked = request.created_by === me;
+  // Whoever made the request or the group owner can cancel it (the database checks too).
+  const canCancel = request.status === "open" && (iAsked || members.get(me)?.role === "owner");
+  const [confirming, setConfirming] = useState(false);
+  const [canceling, setCanceling] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  async function cancel() {
+    setCanceling(true);
+    setProblem(null);
+    const { error } = await supabase.rpc("cancel_document_request", { req: request.id });
+    setCanceling(false);
+    if (error) return setProblem(error.message);
+    setConfirming(false);
+    onChanged();
+  }
   const mine = request.my_status;
   const href = documentHref(request.conversation_id, request.id);
   const due = dueLabel(request.due_date);
@@ -837,8 +874,19 @@ function DocumentCard({ request, me, members }: { request: DocumentRequestView; 
     <div className="w-[min(340px,100%)] overflow-hidden rounded-2xl border border-line bg-white text-left">
       <div className="flex items-center gap-2 bg-tint px-4 py-2.5">
         <FileIcon className="h-[18px] w-[18px] text-ink" />
-        <p className="flex-1 text-[11px] font-bold tracking-[0.14em] text-ink uppercase">Document request</p>
+        <p className="flex-1 text-[11px] font-bold tracking-[0.1em] whitespace-nowrap text-ink uppercase">Document request</p>
         <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${chip.className}`}>{chip.text}</span>
+        {canCancel && (
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            aria-label="Cancel this request"
+            title="Cancel this request"
+            className="-mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink hover:bg-white/70"
+          >
+            <CloseIcon className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <div className="px-4 pt-3">
@@ -884,6 +932,33 @@ function DocumentCard({ request, me, members }: { request: DocumentRequestView; 
           View Details
         </Link>
       </div>
+
+      {canCancel && confirming && (
+        <div role="alertdialog" aria-label="Cancel this request?" className="mx-4 mb-4 rounded-xl bg-butter p-3">
+          <p className="text-sm font-bold text-honey">Cancel this request for everyone?</p>
+          <p className="mt-0.5 text-[13px] text-ink">Nobody can upload to it any more. Files already sent stay private.</p>
+          {problem && <p className="mt-1 text-[13px] font-semibold text-warn">{problem}</p>}
+          <div className="mt-2.5 flex gap-2">
+            <button
+              type="button"
+              autoFocus
+              disabled={canceling}
+              onClick={cancel}
+              className="flex h-10 items-center gap-2 rounded-lg bg-ink px-3.5 text-sm font-bold text-white hover:bg-black disabled:opacity-60"
+            >
+              {canceling ? "Canceling…" : "Yes, Cancel"}
+            </button>
+            <button
+              type="button"
+              disabled={canceling}
+              onClick={() => setConfirming(false)}
+              className="h-10 rounded-lg border border-line bg-white px-3.5 text-sm font-bold hover:bg-white/60 disabled:opacity-60"
+            >
+              Keep It
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
