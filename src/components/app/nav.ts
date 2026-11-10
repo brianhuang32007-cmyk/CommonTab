@@ -7,7 +7,7 @@ export const MENU = [
   { href: "/contacts", label: "Contacts", icon: ContactsIcon },
   { href: "/ai", label: "CommonTab AI", icon: BoltIcon, badge: "NEW" },
   { href: "/documents", label: "Document Drafting", icon: DocumentIcon },
-  { href: "/notifications", label: "Notifications & Reminders", icon: BellIcon },
+  { href: "/notifications", label: "Alerts & Reminders", icon: BellIcon },
 ] as const;
 
 export const PREFERENCES = [{ href: "/preferences", label: "Preferences", icon: SettingsIcon }] as const;

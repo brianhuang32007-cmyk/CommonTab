@@ -5,7 +5,7 @@ import LiveClock from "./LiveClock";
 import { pageTitle } from "./nav";
 import NotificationBell from "./NotificationBell";
 
-// Top bar: page title on the left, live clock in the center, the notification bell on the right.
+// Top bar: page title on the left, live clock in the center, the alert bell on the right.
 // On phones the title and bell live in the header above, so this shows the clock only.
 export default function TopBar() {
   const pathname = usePathname();

@@ -7,7 +7,7 @@ import { useNow } from "@/lib/useNow";
 import { BellIcon } from "./icons";
 import { isNewer, useNotifications } from "./NotificationsContext";
 
-// Bell in the top bar on every page. Opens a fixed-size drop-down of recent notifications
+// Alert bell in the top bar on every page. Opens a fixed-size drop-down of recent alerts
 // (for now: new contact requests). A red count shows how many are unread.
 export default function NotificationBell() {
   const { requests, seenAt, unread, markRead, accept, decline } = useNotifications();
@@ -53,7 +53,7 @@ export default function NotificationBell() {
     setBusy(null);
   }
 
-  const label = unread ? `Notifications, ${unread} unread` : "Notifications";
+  const label = unread ? `Alerts, ${unread} unread` : "Alerts";
 
   return (
     <div ref={wrapper} className="relative">
@@ -83,11 +83,11 @@ export default function NotificationBell() {
         <div
           id={panelId}
           role="region"
-          aria-label="Notifications"
+          aria-label="Alerts"
           className="absolute top-full right-0 z-40 mt-2 flex h-[440px] w-[min(380px,calc(100vw-32px))] flex-col overflow-hidden rounded-[20px] border border-line bg-white shadow-xl shadow-night/15"
         >
           <div className="flex shrink-0 items-center justify-between border-b border-line px-5 py-4">
-            <p className="text-lg font-extrabold text-ink">Notifications</p>
+            <p className="text-lg font-extrabold text-ink">Alerts</p>
             {requests.length > 0 && <span className="text-xs font-bold text-muted">{requests.length}</span>}
           </div>
 
