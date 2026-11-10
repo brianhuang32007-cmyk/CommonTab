@@ -84,6 +84,8 @@ export type MessagesState = {
   retry: () => void;
   /** Add a message the app already has (e.g. the reply to sending). */
   add: (m: Message) => void;
+  /** Remove a message from the list (e.g. after deleting a payment request). */
+  drop: (id: string) => void;
 };
 
 export function useMessages(supabase: Client, conversationId: string): MessagesState {
@@ -129,6 +131,12 @@ export function useMessages(supabase: Client, conversationId: string): MessagesS
           if (data) setMessages((current) => merge(current, [data as Message]));
         },
       )
+      // A deleted message (e.g. a deleted payment request's card). Delete notices only carry
+      // the id, and can't be filtered by chat, so just drop it if it's one of ours.
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "messages" }, (payload) => {
+        const id = (payload.old as { id?: string }).id;
+        if (id) setMessages((current) => current.filter((m) => m.id !== id));
+      })
       .subscribe((state) => {
         if (state !== "SUBSCRIBED") return;
         // Reconnected after a drop: catch up on anything missed.
@@ -168,8 +176,9 @@ export function useMessages(supabase: Client, conversationId: string): MessagesS
   }, [loadLatest]);
 
   const add = useCallback((m: Message) => setMessages((current) => merge(current, [m])), []);
+  const drop = useCallback((id: string) => setMessages((current) => current.filter((m) => m.id !== id)), []);
 
-  return { status, messages, hasOlder, loadingOlder, loadOlder, retry, add };
+  return { status, messages, hasOlder, loadingOlder, loadOlder, retry, add, drop };
 }
 
 /** Uploads a chat file with progress. Uses the signed-in person's own session (never a secret key). */

@@ -224,6 +224,8 @@ export default function MessageList({
                     onRemove={onRemove}
                     me={me}
                     members={byId}
+                    supabase={supabase}
+                    onDrop={state.drop}
                   />
                 </Fragment>
               );
@@ -282,6 +284,8 @@ function Bubble({
   onRemove,
   me,
   members,
+  supabase,
+  onDrop,
 }: {
   item: Item;
   mine: boolean;
@@ -295,6 +299,8 @@ function Bubble({
   onRemove: (o: Outgoing) => void;
   me: string;
   members: Map<string, Member>;
+  supabase: ReturnType<typeof createClient>;
+  onDrop: (messageId: string) => void;
 }) {
   const name = sender ? personName(sender) : "Former member";
   const o = item.outgoing;
@@ -315,7 +321,9 @@ function Bubble({
           <Files saved={item.saved} local={item.local} links={links} mine={mine} onImage={onImage} />
         )}
 
-        {item.request && <RequestCard request={item.request} me={me} members={members} />}
+        {item.request && (
+          <RequestCard request={item.request} me={me} members={members} supabase={supabase} onDeleted={() => onDrop(item.id)} />
+        )}
 
         {item.body && !item.request && (
           <p
@@ -444,7 +452,36 @@ function dayLabel(iso: string) {
 
 /** A payment request in the chat. Everyone sees the total, the due date, who asked, the
  *  progress bar and who has paid; the chip and "your" line say where you stand. */
-function RequestCard({ request, me, members }: { request: PaymentRequestView; me: string; members: Map<string, Member> }) {
+function RequestCard({
+  request,
+  me,
+  members,
+  supabase,
+  onDeleted,
+}: {
+  request: PaymentRequestView;
+  me: string;
+  members: Map<string, Member>;
+  supabase: ReturnType<typeof createClient>;
+  onDeleted: () => void;
+}) {
+  // The group owner or whoever made the request can delete it (the database checks too).
+  const canDelete = request.created_by === me || members.get(me)?.role === "owner";
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  async function remove() {
+    if (deleting) return;
+    setDeleting(true);
+    setProblem(null);
+    const { error } = await supabase.rpc("delete_payment_request", { req: request.id });
+    if (error) {
+      setProblem(error.message);
+      setDeleting(false);
+      return;
+    }
+    onDeleted();
+  }
   const due = dueLabel(request.due_date);
   const iAmPayee = request.payee_id === me;
   const inSplit = request.my_share_cents !== null && !iAmPayee;
@@ -555,6 +592,44 @@ function RequestCard({ request, me, members }: { request: PaymentRequestView; me
           </Link>
         )}
       </div>
+
+      {canDelete &&
+        (confirming ? (
+          <div role="alertdialog" aria-label="Delete this request?" className="mx-4 mb-4 rounded-xl bg-butter p-3">
+            <p className="text-sm font-bold text-honey">Delete this request for everyone?</p>
+            <p className="mt-0.5 text-[13px] text-ink">The card and its shares are removed. This can&apos;t be undone.</p>
+            {problem && <p className="mt-1 text-[13px] font-semibold text-warn">{problem}</p>}
+            <div className="mt-2.5 flex gap-2">
+              <button
+                type="button"
+                autoFocus
+                disabled={deleting}
+                onClick={remove}
+                className="flex h-10 items-center gap-2 rounded-lg bg-ink px-3.5 text-sm font-bold text-white hover:bg-black disabled:opacity-60"
+              >
+                {deleting ? "Deleting…" : "Yes, Delete"}
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setConfirming(false)}
+                className="h-10 rounded-lg border border-line bg-white px-3.5 text-sm font-bold hover:bg-white/60 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="-mt-1 px-4 pb-3 text-center">
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              className="h-9 px-2 text-[13px] font-bold text-muted underline hover:text-ink"
+            >
+              Delete request
+            </button>
+          </div>
+        ))}
     </div>
   );
 }
