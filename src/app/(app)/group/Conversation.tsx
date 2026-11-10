@@ -8,6 +8,7 @@ import { useNotifications } from "@/components/app/NotificationsContext";
 import type { createClient } from "@/lib/supabase/client";
 import Composer from "./Composer";
 import MessageList from "./MessageList";
+import FilesTab from "./FilesTab";
 import RequestsTab from "./RequestsTab";
 import { removeUnsentFiles, useMessages, type Message, type Outgoing } from "./messages";
 import { memberLabel, otherMember, titleOf, type Conversation as Chat } from "./types";
@@ -221,16 +222,7 @@ export default function Conversation({
       )}
 
       {tab === "requests" && <RequestsTab supabase={supabase} chatId={chat.id} />}
-      {tab === "files" && <Empty title="No files yet" text="Receipts and photos shared in this chat will be collected here." />}
+      {tab === "files" && <FilesTab supabase={supabase} chatId={chat.id} me={me} />}
     </section>
-  );
-}
-
-function Empty({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="m-auto max-w-xs px-6 text-center">
-      <p className="font-extrabold">{title}</p>
-      <p className="mt-1.5 text-sm text-muted">{text}</p>
-    </div>
   );
 }
