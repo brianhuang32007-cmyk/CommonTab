@@ -520,15 +520,23 @@ function RequestCard({
   // Tagged to pay: they can settle. The sender and everyone else see Details only.
   // People paying confirm their share first; only then can they settle it.
   const myStatus = request.my_share_status;
-  const action: "confirm" | "settle" | "dispute" | null = !inSplit
-    ? null
-    : myStatus === "pending"
-      ? "confirm"
-      : myStatus === "confirmed"
-        ? "settle"
-        : myStatus === "disputed"
-          ? "dispute"
-          : null;
+  // The requester: Review when someone has sent proof of paying.
+  const toReview = iAmPayee ? (request.shares ?? []).filter((s) => s.status === "marked_paid").length : 0;
+  const action: "confirm" | "settle" | "dispute" | "awaiting" | "review" | null = iAmPayee
+    ? toReview
+      ? "review"
+      : null
+    : !inSplit
+      ? null
+      : myStatus === "pending"
+        ? "confirm"
+        : myStatus === "confirmed"
+          ? "settle"
+          : myStatus === "disputed"
+            ? "dispute"
+            : myStatus === "marked_paid"
+              ? "awaiting"
+              : null;
   const canSettle = action !== null;
   const [confirmingShare, setConfirmingShare] = useState(false);
   const [shareProblem, setShareProblem] = useState<string | null>(null);
@@ -716,6 +724,22 @@ function RequestCard({
             className="flex h-11 items-center justify-center rounded-xl bg-butter text-sm font-bold text-honey hover:bg-butter-strong"
           >
             In Dispute
+          </Link>
+        )}
+        {action === "awaiting" && (
+          <Link
+            href={settleHref(request.conversation_id, request.id)}
+            className="flex h-11 items-center justify-center rounded-xl bg-butter-strong text-sm font-bold text-[#5C4A0B] hover:bg-butter"
+          >
+            Awaiting Approval
+          </Link>
+        )}
+        {action === "review" && (
+          <Link
+            href={`${detailsHref(request.conversation_id, request.id)}#proofs`}
+            className="flex h-11 items-center justify-center rounded-xl bg-brand text-sm font-bold text-white hover:bg-brand-hover"
+          >
+            Review ({toReview})
           </Link>
         )}
         {action === "confirm" && !shareProblem && (

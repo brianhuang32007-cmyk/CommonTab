@@ -23,13 +23,15 @@ import {
   localDay,
   settleHref,
   SHARE_STATUS,
+  type PaymentProof,
   type PaymentRequestDetails,
   type ShareEvent,
 } from "../../../requests";
 import DisputePanel, { disputeFor, useMyDisputes } from "./DisputePanel";
+import ProofList from "./ProofList";
 
 // A payment request's Details page. It adapts to who's looking: the requester sees what
-// they're still owed, people paying see their share and Settle, everyone else sees that
+// they're still owed and reviews payment proof, people paying see their share and Pay, everyone else sees that
 // they're not in it. Everyone in the group sees each person's share and status, where to
 // pay, the receipt and the activity. Settling itself comes in later steps.
 
@@ -45,11 +47,16 @@ export default function RequestDetails() {
   const supabase = useMemo(() => createClient(), []);
   const [state, setState] = useState<State>({ status: "loading" });
   const [photo, setPhoto] = useState<string | null>(null);
+  const [proofs, setProofs] = useState<PaymentProof[]>([]);
   const markedRead = useRef(false);
   const { disputes } = useMyDisputes(requestId);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase.rpc("payment_request_details", { req: requestId });
+    const [{ data, error }, mine] = await Promise.all([
+      supabase.rpc("payment_request_details", { req: requestId }),
+      supabase.rpc("my_payment_proofs", { req: requestId }),
+    ]);
+    if (!mine.error) setProofs((mine.data ?? []) as PaymentProof[]);
     if (error) return setState((s) => (s.status === "ready" ? s : { status: "error" }));
     if (!data) return setState({ status: "missing" });
     const request = data as PaymentRequestDetails;
@@ -77,7 +84,7 @@ export default function RequestDetails() {
       .on("postgres_changes", { event: "*", schema: "public", table: "payment_shares" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "payment_requests" }, refresh)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "payment_share_events" }, refresh)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "payment_transfers" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "payment_proofs" }, refresh)
       .subscribe();
     return () => {
       clearTimeout(timer);
@@ -187,8 +194,15 @@ export default function RequestDetails() {
               <p className="mt-3 rounded-2xl bg-tint px-4 py-3 text-sm text-ink">
                 {stillOwing === 0
                   ? "Everyone has paid you. Nothing left to collect."
-                  : `${stillOwing} ${stillOwing === 1 ? "person still owes" : "people still owe"} you. Each share turns Paid as soon as they pay.`}
+                  : `${stillOwing} ${stillOwing === 1 ? "person still owes" : "people still owe"} you. They pay you on Venmo, PayPal or Zelle and send proof; each share turns Paid when you approve it.`}
               </p>
+              {proofs.some((x) => x.status === "submitted") && (
+                <a href="#proofs" className="mt-3 flex min-h-12 items-center justify-between gap-3 rounded-2xl bg-butter-strong px-4 py-3 text-sm font-bold text-[#5C4A0B] hover:bg-butter">
+                  {proofs.filter((x) => x.status === "submitted").length} payment
+                  {proofs.filter((x) => x.status === "submitted").length === 1 ? " is" : "s are"} waiting for your review
+                  <span>Review</span>
+                </a>
+              )}
             </>
           ) : inSplit ? (
             <div className="flex flex-wrap items-center gap-4">
@@ -289,11 +303,24 @@ export default function RequestDetails() {
             </section>
           ))}
 
-        {/* Payments (demo, no real money): only the payer and the requester see these. */}
+        {/* Payment proof ("I paid" with a screenshot): only the payer and the requester see these. */}
+        {(iAmPayee || inSplit) && proofs.length > 0 && (
+          <section id="proofs" className="scroll-mt-4 rounded-3xl border border-line bg-white p-6 sm:p-7">
+            <h3 className="text-lg font-extrabold">{iAmPayee ? "Payments to review" : "Your payment proof"}</h3>
+            <p className="mt-1 text-[13px] text-muted">
+              {iAmPayee
+                ? "Check each payment arrived in your account, then approve it (the share turns Paid) or reject it with a reason."
+                : "Only you and the requester see these."}
+            </p>
+            <ProofList proofs={proofs} me={me} canReview={iAmPayee && r.status !== "cancelled"} onChanged={load} />
+          </section>
+        )}
+
+        {/* Payments recorded by the earlier in-app demo (before real payments). */}
         {(r.transfers ?? []).length > 0 && (
           <section className="rounded-3xl border border-line bg-white p-6 sm:p-7">
-            <h3 className="text-lg font-extrabold">{iAmPayee ? "Payments Received" : "Your Payment"}</h3>
-            <p className="mt-1 text-[13px] text-muted">Demo payments: no real money moved.</p>
+            <h3 className="text-lg font-extrabold">Earlier demo payments</h3>
+            <p className="mt-1 text-[13px] text-muted">Recorded by the in-app demo before real payments. No real money moved.</p>
             <ul className="mt-3 flex flex-col">
               {(r.transfers ?? []).map((t) => (
                 <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[#EEF1EA] py-2.5 last:border-b-0">
@@ -399,8 +426,12 @@ function eventText(e: ShareEvent, me: string) {
       return `${whose} payment was canceled after a dispute`;
     case "dispute_canceled":
       return `${name} canceled ${you ? "your" : "their"} dispute; the share stays ${dollars(e.amount_cents ?? 0)}`;
+    case "proof_submitted":
+      return `${name} sent proof of paying ${dollars(e.amount_cents ?? 0)}`;
+    case "proof_rejected":
+      return `${whose} payment proof was rejected; waiting for new proof`;
     case "paid":
-      return `${name} paid ${dollars(e.amount_cents ?? 0)}`;
+      return `${name} paid ${dollars(e.amount_cents ?? 0)}${e.actor_id && e.actor_id !== e.user_id ? " (approved)" : ""}`;
   }
 }
 
@@ -457,9 +488,16 @@ function PayerActions({
       <>
         {dispute}
         <Link href={settleHref(r.conversation_id, r.id)} className={primary}>
-          Settle
+          Pay
         </Link>
       </>
+    );
+  } else if (status === "marked_paid") {
+    note = `You sent proof of your payment. ${payee} will check it and approve it (or tell you what's wrong).`;
+    buttons = (
+      <Link href={settleHref(r.conversation_id, r.id)} className={primary}>
+        View My Proof
+      </Link>
     );
   } else if (status === "disputed") {
     note = `You're disputing this share. Work it out with ${payee} in the dispute chat before paying.`;
@@ -471,7 +509,7 @@ function PayerActions({
   } else if (status === "waived") {
     note = `${payee} canceled your payment after your dispute. You don't owe anything.`;
   } else if (status === "settled") {
-    note = `You paid ${payee}. Your receipt is below.`;
+    note = `You paid ${payee}, and they approved it.`;
   }
 
   return (

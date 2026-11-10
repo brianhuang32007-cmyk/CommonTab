@@ -176,7 +176,7 @@ Tab names follow the approved dashboard design (they used to be Chats, Agent and
 - Payment requests are only made in groups for now (hidden in DMs).
 
 ## 5. Confirmation, disputes and settlement (inside requests)
-Share status: `Pending → Confirmed → Paid`, with `Disputed` and `Waived` as side paths. (`Paid` is stored as `settled`; `Marked paid` exists in the database but isn't used.)
+Share status: `Pending → Confirmed → Awaiting approval → Paid`, with `Disputed` and `Waived` as side paths. (`Awaiting approval` is stored as `marked_paid`, `Paid` as `settled`.)
 
 **Confirm:** each person paying confirms their share before they can pay (Confirm on the card, the Details page or the Settle page).
 
@@ -189,12 +189,15 @@ Share status: `Pending → Confirmed → Paid`, with `Disputed` and `Waived` as 
 - **Private:** only the requester and the disputing person see the reason, chat and proposals. The group sees only the status and Activity lines (no reasons).
 - Not built: files in the dispute chat; alerts for new dispute messages and proposals (disputes and their outcomes do show in Recent updates). The request total doesn't change when a share changes or is waived.
 
-**Settle: simulated payments** (Step 11, built 2026-11-10; Brian's call). **No real money moves and no outside app opens; every payment is accepted.** CommonTab still holds no balances or wallets; a payment is only a record of who paid whom.
-- Settle page (`…/settle`), confirmed shares only: **1. Choose a payment method**: only methods **already on the payer's account** (Venmo / PayPal / Zelle, and that the requester takes if they've added any; the requester's preferred first). With none, it links to Preferences to add a handle. → **2. Review and authorize** (amount, recipient's handle, your handle, an editable note) → **Confirm Demo Payment** → **3. Processing** (a progress bar with random pauses, 3 to 7 seconds) → **Payment Complete** with a receipt (amount, method, recipient, transaction ID `CT-…`, time).
-- The share becomes **Paid** right away (no approval). One payment per share; app-made ids stop double payments. When every share is Paid or Waived, the request is **Fully paid** and leaves the open Requests lists.
-- The requester sees **Payments Received** on the Details page (person, amount, method, transaction ID, time); the payer sees **Your Payment**. Nobody else sees payment records. The note and the payer's handle aren't saved yet (receipt only).
-- **Local demo:** `http://localhost:3000/demo/settle` walks through the payer's screens with made-up people and no sign-in, next to what the requester sees (statuses, still owed, progress, reminders), with **Reset Demo**. It only exists under `npm run dev` (not found on the live site) and never touches the database.
-- Real in-app payments aren't possible with Venmo, PayPal or Zelle (no public payment APIs), and Stripe lists peer-to-peer money transmission as restricted, so real payments stay after the MVP.
+**Paying: real payments through Venmo, PayPal or Zelle, with proof** (Brian's call, 2026-11-10; migration `20261110270000_payment_proofs.sql`). This **replaced the simulated in-app payments** (Step 11's first version): `pay_my_share` is switched off and the `/demo/settle` page is gone. Payments recorded by the old demo still show on Details as "Earlier demo payments". **CommonTab still never moves or holds money.**
+- **Save payment details:** in **Preferences → Payment handles**, add, edit or remove a Venmo username, a **PayPal.Me** link or name (a full `paypal.me/name` link is accepted), and a Zelle email or US phone, plus **Show first**.
+- **Make a payment** (`…/settle`, the card's **Settle** button or **Pay** on Details): your share and who you're paying; **1. Choose how to pay**, from the methods the **requester** has added (their preferred one first); **2. Pay**: **Open Venmo** (`venmo.com/<name>?txn=pay&amount=…&note=…`) or **Open PayPal** (`paypal.me/<name>/<amount>USD`) with the amount filled in, or for **Zelle** copy their email or phone, the amount and a memo (title + PR-…) and pay in your bank's app. If the requester has no handles, it says so and asks you to ask them in the chat.
+- **Submit payment proof:** **I Paid** → pick the method, add **1 to 3 screenshots** (JPG, PNG, WebP, HEIC or PDF, 10 MB each; previewed before sending), an optional note → **Submit for Review**. The share shows **Awaiting approval** (card: **Awaiting Approval**). Screenshots live in the private bucket `payment-proofs` (`<request>/<payer>/<proof>/<file>`).
+- **AI check on the screenshot** (Brian's call, 2026-11-10; migration `20261110280000_payment_ai_check.sql`): right after **Submit for Review**, CommonTab AI reads the screenshot and compares it with what was owed: the **amount** (plain code also requires the exact amount for a match), the **recipient** (the handle they were asked to pay), the **app**, the **date**, whether it's **completed**, and any transaction ID. Both people see **AI check: matches what was owed** or **AI couldn't confirm it. Check it by hand.**, with what it read; either can tap **Check Again** while it waits for review. Route `src/app/api/ai/payment-proof/route.ts` (20 per person per day, feature `payment`); results are saved with the same `AI_VERIFY_SECRET` check as documents. **The AI never approves; the requester still decides.**
+- **Review payments:** the requester sees **Payments to review** on Details (also a **Review (N)** button on the card, a banner on Details, and a **Review payment** task in Alerts): who paid, how much, the method, the note and the screenshots, with a link to check their Venmo or PayPal (Zelle: "check your bank's app"). **Approve Payment** → the share is **Paid**; **Reject** needs a reason → the share goes back to **Confirmed**, and the payer sees the reason and **sends new proof**.
+- **Track progress:** statuses on the card, Details and Requests lists; still owed and the settlement progress bar only count approved payments; when every share is Paid or Waived the request is **Fully paid**. Every submission and decision is kept (**Your submissions** on the Pay page; Details for the requester), and Activity shows "sent proof", "payment proof was rejected" and "paid (approved)". Alerts: the requester gets "Payment to review"; the payer gets "Payment approved" or "Payment proof rejected". Reminders keep coming until the share is Paid.
+- **Private:** only the payer and the requester see proofs, screenshots and reasons; the group sees statuses and Activity lines.
+- **Not built:** CommonTab can't confirm a payment itself (Venmo, PayPal and Zelle have no public APIs for that), so the requester's approval is what marks a share Paid.
 
 ## 6. Document requests and AI Verify (inside requests)
 Built 2026-11-10 (Brian's calls). Migration `20261110220000_document_requests.sql`.
@@ -289,7 +292,7 @@ Each step is something we build together, review, then commit.
 | | 8 | @tagging in chat **(done: @mentions, and payment requests tag everyone paying; document requests come with Step 12)** |
 | 3. Money | 9 | Payment requests with equal and custom splits **(done)** |
 | | 10 | Confirm, dispute and dispute threads **(done)** |
-| | 11 | Settlement **(done as simulated in-app payments; no real money)** |
+| | 11 | Settlement **(real payments: pay outside, send proof, requester approves)** |
 | 4. Documents | 12 | Document requests and uploads **(built; live test pending)** |
 | | 13 | AI receipt tools inside requests: scan and split, AI check on uploads |
 | 5. Dashboard | 14 | Dashboard: owe/owed/overdue and progress bars |
@@ -321,8 +324,7 @@ Known gaps from Steps 6 and 7:
 - `src/app/(app)/group/requests.ts`: types and the plain-code money helpers (`splitEvenly`, `splitByPercent`, `parseCents`, `dueLabel`, the page links, `SHARE_STATUS`).
 - `src/app/(app)/group/[chatId]/request/[kind]/`: the Request Payment / Request Document forms (`PaymentForm.tsx`, receipt scan through `/api/ai/receipt`).
 - `src/app/(app)/group/MessageList.tsx` (`RequestCard`), `RequestsTab.tsx`, and `messages.ts` (`refreshRequest`: cards update when a share changes).
-- `src/app/(app)/group/[chatId]/payments/[requestId]/`: `RequestDetails.tsx`, `DisputePanel.tsx` (dispute list and `useMyDisputes`), `dispute/` (start-a-dispute form), `disputes/[disputeId]/DisputeRoom.tsx` (the dispute page), `settle/` (`SettlePanel.tsx` is the shared payment UI; `SettleView.tsx` connects it to the database).
-- `src/app/demo/settle/`: the local no-sign-in demo.
+- `src/app/(app)/group/[chatId]/payments/[requestId]/`: `RequestDetails.tsx`, `DisputePanel.tsx` (dispute list and `useMyDisputes`), `ProofList.tsx` (payment proofs, Approve / Reject), `dispute/` (start-a-dispute form), `disputes/[disputeId]/DisputeRoom.tsx` (the dispute page), `settle/SettleView.tsx` (Pay: choose a method, open Venmo / PayPal or copy Zelle details, I Paid with screenshots).
 
 Tested with @briantest: a full negotiation (propose, decline, counter, accept), cancelling a dispute, and confirming and paying a share end to end.
 
@@ -331,6 +333,8 @@ Tested with @briantest: a full negotiation (propose, decline, counter, accept), 
 **Built: Step 12, Request Document, with AI Verify from Step 13** (2026-11-10; migration `20261110220000_document_requests.sql`). See section 6. Still to test with a second account (e.g. @briantest): uploading, AI Verify on real files, accept and reject, Can't Provide, and the viewer with each file type.
 
 **Done since:** owner can cancel document requests (an × on the card and page), shared **AI Verified** results with `AI_VERIFY_SECRET`, and accepted documents kept in each chat's **Files** tab (migrations `20261110230000` to `20261110250000` have all been run; all live).
+
+**Now: the payment flow again** (started 2026-11-10): real payments with proof replaced the simulation (see section 5). Still to test with @briantest: paying with each method, sending proof, approving and rejecting, and resubmitting.
 
 **Built: Step 15, Document Drafting** (2026-11-10; migration `20261110260000_document_drafting.sql`). See section 7. Still to test with real forms and chats: a fillable PDF, a Word form, a photo of a form, and a spreadsheet from a chat with payment requests and receipts.
 
@@ -343,5 +347,5 @@ Open questions:
 - Groups: what happens when the owner deletes their account?
 - Payment requests: can either person request a payment in a DM (hidden there for now)? Can a request be edited after it's sent? Should the request total change when a dispute changes or waives a share?
 - Disputes: files in the dispute chat, and alerts for new dispute messages and proposals?
-- Payments: save the payment note and the payer's handle so the requester sees them?
+- Payments: should proof expire or remind the requester if it waits too long for review? Should the group owner be able to approve payments too?
 - Document requests: can a request be edited after it's sent (add people, change the due date)?

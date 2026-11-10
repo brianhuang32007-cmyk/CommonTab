@@ -196,12 +196,60 @@ export type PaymentTransfer = {
 export type PayMethod = "venmo" | "paypal" | "zelle";
 export const PAY_METHOD_LABEL: Record<PayMethod, string> = { venmo: "Venmo", paypal: "PayPal", zelle: "Zelle" };
 
+/** "I paid" with a screenshot (my_payment_proofs): only the payer and the requester see these. */
+export type PaymentProof = {
+  id: string;
+  payer_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  amount_cents: number;
+  method: PayMethod;
+  note: string | null;
+  status: "submitted" | "approved" | "rejected";
+  review_reason: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  files: { id: string; path: string; name: string; mime_type: string; size_bytes: number }[];
+  /** The AI check on the screenshot (missing before migration 20261110280000). */
+  ai_status?: "verified" | "failed" | null;
+  ai_result?: PaymentAiCheck | null;
+  ai_checked_at?: string | null;
+};
+
+/** What the AI read from a payment screenshot. It never approves; the requester decides. */
+export type PaymentAiCheck = {
+  verdict: "matches" | "partial" | "does_not_match" | "unreadable";
+  reason: string;
+  amount_seen_cents: number | null;
+  recipient_seen: string | null;
+  app_seen: string | null;
+  date_seen: string | null;
+  transaction_id: string | null;
+  completed: boolean | null;
+  owed_cents: number;
+};
+
+/** Opens Venmo (the app on phones) to pay someone, with the amount and a note filled in. */
+export const venmoPayUrl = (username: string, cents: number, note: string) =>
+  `https://venmo.com/${encodeURIComponent(username.replace(/^@/, ""))}?txn=pay&amount=${(cents / 100).toFixed(2)}&note=${encodeURIComponent(note)}`;
+
+/** Opens PayPal.Me with the amount filled in. */
+export const paypalPayUrl = (username: string, cents: number) =>
+  `https://paypal.me/${encodeURIComponent(username)}/${(cents / 100).toFixed(2)}USD`;
+
+/** Where the requester checks that money arrived. */
+export const CHECK_ACCOUNT: Record<PayMethod, { label: string; href: string | null }> = {
+  venmo: { label: "Open Venmo", href: "https://account.venmo.com/" },
+  paypal: { label: "Open PayPal", href: "https://www.paypal.com/myaccount/activities/" },
+  zelle: { label: "Check your bank's app", href: null },
+};
+
 /** One line of a share's history, visible to the group (never a dispute's reason or chat). */
 export type ShareEvent = {
   id: number;
   user_id: string;
   actor_id: string | null;
-  kind: "confirmed" | "disputed" | "amount_changed" | "waived" | "paid" | "dispute_canceled";
+  kind: "confirmed" | "disputed" | "amount_changed" | "waived" | "paid" | "dispute_canceled" | "proof_submitted" | "proof_rejected";
   amount_cents: number | null;
   previous_cents: number | null;
   created_at: string;
@@ -237,7 +285,8 @@ export type DisputeProposal = {
 export const SHARE_STATUS: Record<NonNullable<PaymentRequestView["my_share_status"]>, { label: string; className: string }> = {
   pending: { label: "Pending", className: "bg-mist text-muted" },
   confirmed: { label: "Confirmed", className: "bg-tint text-brand" },
-  marked_paid: { label: "Marked paid", className: "bg-tint text-brand" },
+  // "I paid" with a screenshot, waiting for the requester to approve it.
+  marked_paid: { label: "Awaiting approval", className: "bg-butter-strong text-[#5C4A0B]" },
   settled: { label: "Paid", className: "bg-brand text-white" },
   // No red for money states: yellow with dark text.
   disputed: { label: "Disputed", className: "bg-butter text-honey" },

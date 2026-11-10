@@ -49,6 +49,26 @@ export const TASK: Record<TaskKind, { status: string; button: string; iconClass:
 /** Your payment shares that still need you: confirm, pay, or an open dispute. */
 export function shareTasks(rows: PaymentRequestRow[] | null): Task[] {
   return (rows ?? []).flatMap((r): Task[] => {
+    // Your own request: someone sent proof of paying, and it's waiting for you.
+    if (r.direction === "sent") {
+      const waiting = (r.shares ?? []).filter((s) => s.status === "marked_paid");
+      if (!waiting.length) return [];
+      return [
+        {
+          key: `review-payment-${r.id}`,
+          readKey: alertKey.payment(r.id),
+          kind: "review-payment",
+          category: "payments",
+          title: r.title,
+          group: r.conversation_name ?? (r.conversation_kind === "dm" ? "Direct message" : "Group"),
+          detail: `${waiting.length === 1 ? "1 payment" : `${waiting.length} payments`} to approve: ${dollars(waiting.reduce((a, s) => a + s.amount_cents, 0))} · ${paymentRef(r.id)}`,
+          due: r.due_date,
+          cents: waiting.reduce((a, s) => a + s.amount_cents, 0),
+          at: r.created_at ?? null,
+          href: `${detailsHref(r.conversation_id, r.id)}#proofs`,
+        },
+      ];
+    }
     if (r.direction !== "received" || r.my_share_cents === null) return [];
     const kind: TaskKind | null =
       r.my_share_status === "pending"
@@ -139,6 +159,8 @@ export type RequestEvent = {
     | "waived"
     | "paid"
     | "dispute_canceled"
+    | "proof_submitted"
+    | "proof_rejected"
     // Document requests:
     | "submitted"
     | "accepted"
@@ -172,7 +194,11 @@ export function describeEvent(e: RequestEvent): { title: string; detail: string;
     case "paid":
       return e.i_am_requester
         ? { title: "Payment received", detail: `${who} paid ${amt}`, tone: "done" }
-        : { title: "Payment complete", detail: `You paid ${amt}`, tone: "done" };
+        : { title: "Payment approved", detail: `${e.actor_first_name ?? "The requester"} approved your ${amt} payment`, tone: "done" };
+    case "proof_submitted":
+      return { title: "Payment to review", detail: `${who} says they paid ${amt}. Check your account, then approve it.`, tone: "info" };
+    case "proof_rejected":
+      return { title: "Payment proof rejected", detail: `${e.actor_first_name ?? "The requester"} rejected your proof. See why and send new proof.`, tone: "warn" };
     case "confirmed":
       return { title: "Share confirmed", detail: `${who} confirmed their share of ${amt}`, tone: "info" };
     case "disputed":
