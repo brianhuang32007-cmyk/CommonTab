@@ -1,5 +1,6 @@
 import { isStepCount, streamText, tool } from "ai";
 import { z } from "zod";
+import { looksLike } from "@/lib/aiFiles";
 import { createClient } from "@/lib/supabase/server";
 
 // CommonTab AI chat. Runs on the server only; the browser never sees an AI key.
@@ -32,24 +33,6 @@ const Body = z.object({
     .nullable()
     .optional(),
 });
-
-/** Does the file really start like the type it claims? (Stops renamed or fake files.) */
-function looksLike(mediaType: string, base64: string) {
-  const head = Buffer.from(base64.slice(0, 24), "base64");
-  const starts = (...bytes: number[]) => bytes.every((b, i) => head[i] === b);
-  switch (mediaType) {
-    case "image/jpeg":
-      return starts(0xff, 0xd8, 0xff);
-    case "image/png":
-      return starts(0x89, 0x50, 0x4e, 0x47);
-    case "image/webp":
-      return head.subarray(0, 4).toString("latin1") === "RIFF" && head.subarray(8, 12).toString("latin1") === "WEBP";
-    case "application/pdf":
-      return head.subarray(0, 5).toString("latin1") === "%PDF-";
-    default:
-      return false;
-  }
-}
 
 /** Splits whole cents evenly; extra cents go to the first people ($100 / 3 = $33.34, $33.33, $33.33). */
 function splitEvenly(totalCents: number, people: string[]) {

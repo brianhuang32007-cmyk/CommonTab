@@ -223,7 +223,7 @@ export default function Composer({
   const listId = `${ids}-mentions`;
 
   return (
-    <div className="relative shrink-0 border-t border-line px-4 pt-3 pb-4 sm:px-5">
+    <div className="relative shrink-0 px-4 pt-2 pb-4 sm:px-5">
       {/* @mention suggestions, above the box */}
       {mention && (
         <div className="absolute inset-x-4 bottom-full z-20 mb-2 overflow-hidden rounded-2xl border border-line bg-white shadow-xl shadow-night/10 sm:inset-x-5">

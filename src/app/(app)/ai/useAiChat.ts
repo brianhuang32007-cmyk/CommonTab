@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { shrinkPhoto, toBase64 } from "@/lib/photos";
 import type { ChatEntry } from "./blocks";
 
 // One conversation with CommonTab AI: sending questions to /api/ai/chat (server only),
@@ -10,8 +11,6 @@ import type { ChatEntry } from "./blocks";
 // Nothing is saved to the database yet; it clears when you reload or close the tab.
 
 export const FILE_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
-/** Photos are shrunk to this size before they're sent; PDFs can't be, so they have a smaller limit. */
-const PHOTO_EDGE = 1600;
 export const PHOTO_MAX = 10 * 1024 * 1024;
 export const PDF_MAX = 3 * 1024 * 1024;
 const READ_FILE = "Read this file and tell me what's in it.";
@@ -159,28 +158,6 @@ export function useAiChat(): AiChat {
 /** Turns an attached file into what the AI route expects. Photos are shrunk to at most
  *  1600 px on the longest side (as a JPEG); PDFs are sent as they are (3 MB at most). */
 async function prepareFile(file: File): Promise<{ name: string; mediaType: string; data: string }> {
-  if (file.type === "application/pdf") return { name: file.name, mediaType: file.type, data: await base64(file) };
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, PHOTO_EDGE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Couldn't prepare the photo.");
-  ctx.fillStyle = "#FFFFFF"; // transparent PNGs get a white background
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
-  if (!blob) throw new Error("Couldn't prepare the photo.");
-  return { name: file.name, mediaType: "image/jpeg", data: await base64(blob) };
-}
-
-function base64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
+  if (file.type === "application/pdf") return { name: file.name, mediaType: file.type, data: await toBase64(file) };
+  return { name: file.name, mediaType: "image/jpeg", data: await toBase64(await shrinkPhoto(file)) };
 }

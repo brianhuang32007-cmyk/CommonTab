@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
-import { FileIcon } from "@/components/app/icons";
+import { CardIcon, FileIcon } from "@/components/app/icons";
 import { signedLinks } from "@/lib/signedLinks";
 import type { createClient } from "@/lib/supabase/client";
 import { fileSize, type Attachment, type DraftFile, type MessagesState, type Outgoing } from "./messages";
+import { detailsHref, dollars, dueLabel, settleHref, type PaymentRequestView } from "./requests";
 import { personName, type Conversation, type Member } from "./types";
 
 // The scrolling message history. Newest at the bottom; scrolling to the top loads older
@@ -20,6 +22,8 @@ type Item = {
   saved: Attachment[];
   local: DraftFile[];
   outgoing?: Outgoing;
+  /** A payment request's card (shown instead of the text). */
+  request?: PaymentRequestView | null;
 };
 
 export default function MessageList({
@@ -62,6 +66,7 @@ export default function MessageList({
       mentions: m.mentions,
       createdAt: m.created_at,
       saved: m.attachments,
+      request: m.payment_request ?? null,
       local: [],
     })),
     // Sent but not saved yet (or failed). Once saved, the real message takes its place.
@@ -217,6 +222,8 @@ export default function MessageList({
                     onImage={followImage}
                     onRetry={onRetry}
                     onRemove={onRemove}
+                    me={me}
+                    members={byId}
                   />
                 </Fragment>
               );
@@ -273,6 +280,8 @@ function Bubble({
   onImage,
   onRetry,
   onRemove,
+  me,
+  members,
 }: {
   item: Item;
   mine: boolean;
@@ -284,6 +293,8 @@ function Bubble({
   onImage: () => void;
   onRetry: (o: Outgoing) => void;
   onRemove: (o: Outgoing) => void;
+  me: string;
+  members: Map<string, Member>;
 }) {
   const name = sender ? personName(sender) : "Former member";
   const o = item.outgoing;
@@ -304,7 +315,9 @@ function Bubble({
           <Files saved={item.saved} local={item.local} links={links} mine={mine} onImage={onImage} />
         )}
 
-        {item.body && (
+        {item.request && <RequestCard request={item.request} me={me} members={members} />}
+
+        {item.body && !item.request && (
           <p
             title={full}
             className={`rounded-2xl px-3.5 py-2 text-[15px] leading-6 break-words whitespace-pre-wrap [overflow-wrap:anywhere] ${
@@ -427,4 +440,121 @@ function dayLabel(iso: string) {
     day: "numeric",
     ...(d.getFullYear() !== today.getFullYear() ? { year: "numeric" } : {}),
   });
+}
+
+/** A payment request in the chat. Everyone sees the total, the due date, who asked, the
+ *  progress bar and who has paid; the chip and "your" line say where you stand. */
+function RequestCard({ request, me, members }: { request: PaymentRequestView; me: string; members: Map<string, Member> }) {
+  const due = dueLabel(request.due_date);
+  const iAmPayee = request.payee_id === me;
+  const inSplit = request.my_share_cents !== null && !iAmPayee;
+  // Tagged to pay: they can settle. The sender and everyone else see Details only.
+  const canSettle = inSplit;
+  const firstName = (id: string | null) =>
+    id === me ? "you" : id ? (members.get(id)?.first_name ?? "a former member") : "a former member";
+
+  // Progress counts the people who owe the payee (the payee's own share isn't something to collect).
+  const payers = (request.shares ?? []).filter((s) => s.user_id !== request.payee_id);
+  const paid = payers.filter((s) => s.status === "settled");
+  const waiting = payers.filter((s) => s.status !== "settled");
+  const percent = payers.length ? Math.round((paid.length / payers.length) * 100) : 0;
+  const names = (list: typeof payers) =>
+    list.map((s) => (s.user_id === me ? "You" : (members.get(s.user_id)?.first_name ?? "Former member"))).join(", ");
+
+  const chip = iAmPayee
+    ? { text: "You requested", className: "bg-white text-brand" }
+    : inSplit
+      ? { text: "You're paying", className: "bg-butter-strong text-[#5C4A0B]" }
+      : { text: "Not in this request", className: "bg-white text-muted" };
+
+  return (
+    <div className="w-[min(340px,100%)] overflow-hidden rounded-2xl border border-line bg-white text-left">
+      <div className="flex items-center gap-2 bg-tint px-4 py-2.5">
+        <CardIcon className="h-[18px] w-[18px] text-ink" />
+        <p className="flex-1 text-[11px] font-bold tracking-[0.14em] text-ink uppercase">Payment request</p>
+        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${chip.className}`}>{chip.text}</span>
+      </div>
+
+      <div className="px-4 pt-3">
+        <p className="text-lg leading-6 font-extrabold break-words">{request.title}</p>
+        <p className="mt-0.5 font-extrabold">{dollars(request.total_cents)} total</p>
+        <p className="mt-0.5 text-[13px] text-muted">
+          <span className={due.overdue ? "rounded-full bg-butter px-1.5 py-0.5 font-bold text-honey" : ""}>{due.text}</span> · Requested by{" "}
+          {iAmPayee ? "you" : firstName(request.created_by)}
+        </p>
+      </div>
+
+      <div className="mx-4 mt-3 border-t border-line pt-3">
+        {iAmPayee ? (
+          <p className="flex items-baseline justify-between font-bold">
+            You&apos;re still owed{" "}
+            <span className="text-lg font-extrabold text-brand">
+              {dollars(
+                Math.max(
+                  0,
+                  waiting.reduce((a, s) => a + s.amount_cents, 0),
+                ),
+              )}
+            </span>
+          </p>
+        ) : inSplit ? (
+          <p className="flex items-baseline justify-between font-bold">
+            Your share
+            <span className="text-lg font-extrabold text-ink">
+              {request.my_share_status === "settled" ? "Settled" : dollars(request.my_share_cents ?? 0)}
+            </span>
+          </p>
+        ) : (
+          <p className="flex items-baseline justify-between text-muted">
+            You&apos;re not in this request <span className="font-bold">$0.00</span>
+          </p>
+        )}
+
+        {payers.length > 0 && (
+          <>
+            <div
+              className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-mist"
+              role="progressbar"
+              aria-label="Settled so far"
+              aria-valuenow={percent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div className="h-full rounded-full bg-leaf" style={{ width: `${percent}%` }} />
+            </div>
+            <p className="mt-1.5 text-[13px] text-muted">
+              {paid.length} of {payers.length} settled
+            </p>
+            <p className="mt-1 text-[13px] text-ink">
+              <span className="font-bold text-brand">Paid:</span> {paid.length ? names(paid) : "no one yet"}
+            </p>
+            {waiting.length > 0 && (
+              <p className="text-[13px] text-ink">
+                <span className="font-bold">Not paid yet:</span> {names(waiting)}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className={`grid gap-2 px-4 pt-3 pb-4 ${canSettle ? "grid-cols-2" : "grid-cols-1"}`}>
+        <Link
+          href={detailsHref(request.conversation_id, request.id)}
+          className={`flex h-11 items-center justify-center rounded-xl text-sm font-bold ${
+            canSettle ? "border border-line bg-white text-ink hover:bg-mist" : "bg-brand text-white hover:bg-brand-hover"
+          }`}
+        >
+          Details
+        </Link>
+        {canSettle && (
+          <Link
+            href={settleHref(request.conversation_id, request.id)}
+            className="flex h-11 items-center justify-center rounded-xl bg-brand text-sm font-bold text-white hover:bg-brand-hover"
+          >
+            Settle
+          </Link>
+        )}
+      </div>
+    </div>
+  );
 }

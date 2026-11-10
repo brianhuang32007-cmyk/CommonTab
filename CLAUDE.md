@@ -45,7 +45,7 @@ Brian's planning doc is the Google Doc titled **"CommonTab"** (ID `15eORCYKhQXNj
 
 Model names are exact gateway ids (`provider/model`); check them at https://ai-gateway.vercel.sh/v1/models and the free-tier list in the Vercel dashboard (AI Gateway tab). Keep model names in environment variables, not code.
 
-**AI is the current focus (the CommonTab AI bot, Step 16).** No AI code exists yet. We tried a direct Gemini key first, but Google's new "auth keys" (`AQ.…`) failed with empty 404s and `ACCESS_TOKEN_TYPE_UNSUPPORTED`, so we use **Vercel AI Gateway** instead.
+**AI is connected and live** (the CommonTab AI bot, Step 16; code in `src/app/api/ai/chat/route.ts` and `src/app/(app)/ai/`). We tried a direct Gemini key first, but Google's new "auth keys" (`AQ.…`) failed with empty 404s and `ACCESS_TOKEN_TYPE_UNSUPPORTED`, so we use **Vercel AI Gateway** instead.
 - **Keys:** on Vercel, deployments sign in to the gateway automatically (OIDC), so production needs no AI secret. Locally, Brian creates an AI Gateway API key in the Vercel dashboard and puts it in `.env.local` as `AI_GATEWAY_API_KEY` himself (never in chat or code).
 - **Models:** `.env.local` has `AI_GATEWAY_API_KEY`, `AI_MODEL_DEFAULT=google/gemini-2.5-flash-lite` and `AI_MODEL_FALLBACK=openai/gpt-4o-mini` (2026-11-10). The `ai_calls` log records which model actually answered, so check it if answers seem off (that's how we found Haiku silently falling back). Vercel Production still needs the two model variables, but **not** the API key (the live site uses OIDC; a key there would override it).
 - **Spend:** set an AI Gateway budget in the dashboard, alongside the per-user daily limits below.
@@ -146,11 +146,18 @@ Tab names follow the approved dashboard design (they used to be Chats, Agent and
 - New messages show in the alert bell, and the Group tab shows the unread count.
 
 ## 4. Payment requests (tagged)
-- Create one from a chat. Fields: title, purpose, total, due date, receipt (photo or PDF), and tagged people.
+- Create one from a chat: two buttons sit just above the message box, **Request Payment** and **Request Document** (decided 2026-11-10).
+- **Only the group's owner and organizers can request a payment** (Request Payment is hidden for members, and the database enforces it). **Anyone in the group can request a document.**
+- Each button opens a **separate page with a form**. For now the form has **only the request's title**; Brian will specify the other fields later (decided 2026-11-10).
+- Fields: title, purpose, total, due date, receipt (photo or PDF), and tagged people.
+- **Each payment request and each document request has its own separate page with its own link** (decided 2026-11-10). The chat card's Details button, the group's Requests tab, alerts and the Dashboard all open that page.
+- **After it's made, a payment request goes public in the chat** as a card and appears in each tagged person's Requests list (decided 2026-11-10). The card shows the **due date**, the **total**, and **what the person viewing it owes**, with two buttons side by side: **Details** (a page with the payment's details) and **Settle** (a page for settling it). Both pages stay empty for now. **Only the people tagged to pay see both buttons; the sender and anyone not tagged see Details only** (decided 2026-11-10).
+- **Requests and documents lists** are a clear record of every current request the user **sent and/or received**: each row shows what it is, who it's from or to, the amount or document, its status and its deadline, and opens that request's page. **Sorted by the most urgent deadline first** (overdue, then due soonest, then no deadline) (decided 2026-11-10).
 - Split options:
   - **Equal:** $100 over 5 people is $20 each. When it doesn't divide evenly, extra cents go to the first people ($100 / 3 = $33.34, $33.33, $33.33).
   - **Custom:** set an amount per person.
   - **AI scan:** attach a receipt or bill. AI reads the total and splits it evenly among the tagged people.
+- **Receipt** (decided 2026-11-10): two options, **Attach a Photo** (from the device) or **Take a Photo** (opens the camera). The AI scans it and turns it into a **clear digital receipt** with the key information (vendor, date, items, subtotal, tax, tip, total). The requester checks and can correct it before sending; the original photo stays attached. Private to the group, like chat files. The AI reads and drafts only; plain code does any math.
 - The request shows who gets paid, with their handles.
 - Pay buttons:
   - **Venmo:** opens the Venmo app with the amount and note filled in
@@ -166,7 +173,7 @@ Tab names follow the approved dashboard design (they used to be Chats, Agent and
 - Share status: `Pending → Confirmed → Marked paid → Settled`, or `Disputed` (back to Pending once resolved).
 
 ## 6. Document requests and AI check (inside requests)
-- In a chat, tag someone with a document request ("@Alex I need the receipt for gas"). Choose a document type and an optional deadline.
+- In a chat, anyone can use **Request Document** and tag someone ("@Alex I need the receipt for gas"). Choose a document type and an optional deadline.
 - The tagged person uploads the photo or file.
 - **AI check:**
   - Confirms the upload matches the requested type
@@ -225,20 +232,20 @@ Each step is something we build together, review, then commit.
 | | 6 | Groups: create a group, invite friends, roles **(done)** |
 | | 7 | Real-time chat and direct messages **(done)** |
 | | 8 | @tagging in chat **(@mentions done; tagging requests comes with Steps 9 and 12)** |
-| 3. Money | 9 | Payment requests with equal and custom splits |
+| 3. Money | 9 | Payment requests with equal and custom splits **(current)** |
 | | 10 | Confirm, dispute and dispute threads |
 | | 11 | Pay buttons (Venmo, PayPal, Zelle) and settlement with proof |
 | 4. Documents | 12 | Document requests and uploads |
 | | 13 | AI receipt tools inside requests: scan and split, AI check on uploads |
 | 5. Dashboard | 14 | Dashboard: owe/owed/overdue and progress bars |
 | 6. AI | 15 | Documents tab: AI drafting with follow-up questions |
-| | 16 | CommonTab Agent: questions and answers **(current; moved ahead of Steps 9 to 15)** |
+| | 16 | CommonTab Agent: questions and answers **(done early: groups, chats, contacts, reading receipts; payment and document answers come as those steps land)** |
 | | 17 | Agent reminders (scheduled job) |
 | 7. Ship | 18 | Polish, mobile check, deploy, test run with a real group |
 
 ## Current step
 
-Last update: 2026-11-10. Steps 1 to 3 and 5 to 7 are done and live (Step 4 is covered by the app frame in `src/app/(app)/layout.tsx`). Contacts still needs a live test with two accounts.
+Last update: 2026-11-10. Steps 1 to 3, 5 to 7 and the first part of Step 16 are done and live (Step 4 is covered by the app frame in `src/app/(app)/layout.tsx`). Contacts still needs a live test with two accounts.
 
 **Done: Steps 6 and 7, Groups and chats** (migrations `20261110030000` to `20261110090000` have all been run). Code is in `src/app/(app)/group/`. Groups with owner, organizer and member roles; a Details window (members, roles, Invite Contacts with search, Edit Group, Delete Group, Make Owner); DMs; chat with date lines, older messages on scroll, live updates, attachments (JPG, PNG, WebP or PDF, up to 5 at 10 MB each, private to members) and @mentions; an "@ You" badge on chats with unread mentions; new messages in the alert bell; and the unread count on the Group tab. Group pictures and chat files are private and open through short-lived links (`src/lib/signedLinks.ts`). Every write goes through checked database functions, and app-made ids stop duplicates on retry.
 
@@ -247,13 +254,23 @@ Known gaps from Steps 6 and 7:
 - Sending, attachments, the "@ You" badge and message alerts still need a live test with a second account (e.g. @briantest).
 - Drafts aren't kept when switching chats. Files left behind when the browser closes mid-upload aren't cleaned up yet (a scheduled cleanup could come with Step 17).
 
-**Current: Step 16, the CommonTab AI bot, before payment requests and documents** (Brian's call, 2026-11-10). Build it one piece at a time and plan each piece with Brian before writing code. What's already there:
-- `/ai` is a "Coming soon" placeholder; the CommonTab AI button (lightning icon) shows only on the Dashboard.
-- There are no payment requests or documents yet, so for now the bot can only see the user's own groups, chats, messages and contacts.
-- Rules that apply: AI calls run server-side only (Next.js API routes), keys stay in environment variables, the bot only sees the signed-in user's own data, it drafts and suggests but never posts, approves or pays, and plain code does any math. See also "AI cost protections" above (login, daily limits, logging, fallback).
+**Done early: Step 16, CommonTab AI** (migration `20261110100000_ai_calls.sql` has been run; live with Vercel's OIDC and the `AI_MODEL_*` variables set for Production).
+- The `/ai` page and a small chat window on the Dashboard ("Ask CommonTab AI") share one conversation (`AiChatProvider` in the app frame). The page shows the full history; the window shows only what's asked during the current Dashboard visit. Not saved to the database yet (clears on reload).
+- The AI can look up the user's own groups, chats, messages and contacts, read one attached photo (shrunk in the browser) or PDF (3 MB max), and split an amount with `split_evenly` (plain code, extra cents to the first people). It can't post, change, approve or pay anything.
+- Limits: 30 questions per person in any 24 hours, every call logged in `ai_calls` (including which model answered).
+- When requests exist, give the AI read-only tools for them (what you owe, who still owes, due dates) and use the answer cards in `src/app/(app)/ai/blocks.tsx` (payment summary, document request).
+
+**Dashboard** now matches the Group page: real groups (unread counts, "@ You"), Recent activity (chats with new messages) and Needs your attention (mentions). The money cards (You owe, You're owed, Overdue, Settled) are still $0 placeholders and get real numbers in Step 9.
+
+**Current: Step 9, payment requests with equal and custom splits** (Brian's call, 2026-11-10), then Steps 10 to 12. Build one piece at a time and plan each piece with Brian before writing code. See section 4 above for the spec. What's already in place:
+- Requests are created from a chat. The chat already has @mentions stored by user id, which is how people get tagged in a request.
+- The Conversation view has a **Requests** tab (empty placeholder) next to Chat and Files, and the chat side panel has a "Needs your attention" card.
+- Payment handles (Venmo, PayPal, Zelle, plus which to show first) are already stored on each profile and shown in DMs.
+- Receipts can reuse the private `chat-files` storage pattern (members only, short-lived links).
+- Rules that apply: amounts in whole cents and all math in plain code (equal split: extra cents to the first people); money states never use red ("you owe" is ink, overdue and disputed are honey on butter); every write goes through checked database functions with app-made ids so retries can't duplicate; CommonTab never holds money.
 
 Open questions:
-- AI bot: what should it answer before requests exist (e.g. summarize a chat, find a message)? Where are its conversations stored, and what are the daily limits?
+- AI bot: should conversations be saved to the database (so they survive a reload and sync across devices)?
 - Groups: what happens when the owner deletes their account?
-- Can any member create payment requests, or only organizers?
+- Payment requests: in a DM there are no organizers, so can either person request a payment there? Who gets paid (always the creator, or can they pick someone)? Can a request be edited or cancelled after it's sent, and by whom? Must every tagged person be a group member, and can the creator include themselves in the split?
 - What's the scope of "AI helps fill out documents," and is it in the MVP?

@@ -1,12 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
-import { ChevronLeftIcon, InfoIcon } from "@/components/app/icons";
+import { CardIcon, ChevronLeftIcon, FileIcon, InfoIcon } from "@/components/app/icons";
 import { useNotifications } from "@/components/app/NotificationsContext";
 import type { createClient } from "@/lib/supabase/client";
 import Composer from "./Composer";
 import MessageList from "./MessageList";
+import RequestsTab from "./RequestsTab";
 import { removeUnsentFiles, useMessages, type Message, type Outgoing } from "./messages";
 import { memberLabel, otherMember, titleOf, type Conversation as Chat } from "./types";
 
@@ -110,6 +112,7 @@ export default function Conversation({
     });
   }, [supabase, chat.id, hadUnread, lastFromOthers, state.status, atBottom, visible, latest, onRead, refreshAlerts]);
   const isGroup = chat.kind === "group";
+  const myRole = chat.members.find((m) => m.user_id === me)?.role;
   const other = otherMember(chat, me);
   const title = titleOf(chat, me);
   const subtitle = isGroup ? memberLabel(chat.members.length) : other ? `@${other.username}` : "This person deleted their account";
@@ -188,6 +191,25 @@ export default function Conversation({
             onRetry={deliver}
             onRemove={remove}
           />
+          {/* Requests start here. Only the owner and organizers can request a payment. */}
+          <div className="flex shrink-0 flex-wrap gap-2 border-t border-line px-4 pt-3 sm:px-5">
+            {isGroup && (myRole === "owner" || myRole === "organizer") && (
+              <Link
+                href={`/group/${chat.id}/request/payment`}
+                className="flex h-11 items-center gap-2 rounded-full border border-line bg-white px-4 text-sm font-bold text-ink hover:bg-tint"
+              >
+                <CardIcon className="h-[18px] w-[18px] text-brand" />
+                Request Payment
+              </Link>
+            )}
+            <Link
+              href={`/group/${chat.id}/request/document`}
+              className="flex h-11 items-center gap-2 rounded-full border border-line bg-white px-4 text-sm font-bold text-ink hover:bg-tint"
+            >
+              <FileIcon className="h-[18px] w-[18px] text-brand" />
+              Request Document
+            </Link>
+          </div>
           <Composer
             supabase={supabase}
             conversationId={chat.id}
@@ -198,7 +220,7 @@ export default function Conversation({
         </>
       )}
 
-      {tab === "requests" && <Empty title="No requests yet" text="Payment and document requests made in this chat will be listed here." />}
+      {tab === "requests" && <RequestsTab supabase={supabase} chatId={chat.id} />}
       {tab === "files" && <Empty title="No files yet" text="Receipts and photos shared in this chat will be collected here." />}
     </section>
   );

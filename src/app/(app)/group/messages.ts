@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { createClient } from "@/lib/supabase/client";
+import type { PaymentRequestView } from "./requests";
 
 // Messages for one conversation: shapes, loading (newest first, older pages on request),
 // live updates, and file uploads. Shapes match supabase/migrations/20261110080000_messages.sql.
@@ -29,6 +30,8 @@ export type Message = {
   attachments: Attachment[];
   /** Ids of the people mentioned. */
   mentions: string[];
+  /** Set when this message is a payment request's card. */
+  payment_request?: PaymentRequestView | null;
 };
 
 /** A file picked in the composer. It's uploaded right away so the person can see progress. */
