@@ -89,8 +89,8 @@ Rules:
 **Type and shapes:** Plus Jakarta Sans. Page titles 28–32px ExtraBold (800); card titles 18–20px ExtraBold; body 14–16px; small labels 11–12px Bold, uppercase with wide letter spacing. Cards are white with a 1px `line` border and 20–24px corners; buttons and inputs are 44–52px tall with 10–14px corners; badges and chips are fully rounded. Touch targets at least 44px.
 
 **Layout and names:**
-- **Desktop:** left sidebar with the logo; **Menu** (Dashboard, Group, Contacts, CommonTab AI, Documents & Receipts) and **Preferences** (Settings); payment handles box and profile card at the bottom. Top bar: page title on the left, a large live clock with the date in the center, the main action on the right (on the dashboard: **Add Contact**).
-- **Phone:** top bar with logo mark, title, action icon and profile photo (opens Profile & Settings); bottom tabs Home, Group, Contacts, AI, Docs.
+- **Desktop:** left sidebar with the logo; **Menu** (Dashboard, Group, Contacts, CommonTab AI, Documents & Receipts) and **Preferences** (Preferences, Log out); payment handles box (all three providers with their logos; missing ones show an underlined **Add handle** link) and profile card at the bottom. The profile card opens the **Profile** page. Top bar: page title on the left, a large live clock with the date in the center, the main action on the right (on the dashboard: **Add Contact**).
+- **Phone:** top bar with logo mark, title, action icon and profile photo (opens Profile); bottom tabs Home, Group, Contacts, AI, Docs.
 - **CommonTab AI** always uses the lightning-bolt icon and can be collapsed to an "Ask CommonTab AI" button. It drafts and suggests; the user taps to send.
 - Button labels use Title Case for main actions: **Add Contact**, **Create Group**.
 
@@ -107,20 +107,22 @@ Rules:
 | **Contacts** | Friends list, adding friends by username |
 | **CommonTab AI** | The AI chatbot (lightning icon) |
 | **Documents & Receipts** | The AI drafting tool (see section 7) |
-| **Profile & Settings** | Profile, payment handles and preferences. On phones, open it from the profile photo in the top corner. |
+| **Preferences** | Profile summary with **Edit Profile** (opens the separate **Profile** page), payment handles, reminders, privacy, account. |
+| **Profile** (`/profile`) | Edit photo, name, username, phone and birthday. Opened from Edit Profile or the sidebar's profile card. |
 
 Tab names follow the approved dashboard design (they used to be Chats, Agent and Documents). The planning doc still uses the old names.
 
-## 1. Accounts, profile and settings
+## 1. Accounts, profile and preferences
 - Sign up and log in with Supabase: **Google**, or **email and password** (8+ characters, email must be confirmed). Log in page has **Forgot password?** → email link → **Reset password**.
 - After signing up, everyone must **create their profile** before reaching the dashboard:
   - Required: **username** (unique, 3–20 lowercase letters, numbers or `_`, checked live), **first name**, **last name**, **birthday** (13 or older; private).
   - Optional: **phone number** (US), **profile photo** (JPG/PNG/WebP up to 2 MB; default is a green person icon), and **payment handles** for Venmo, PayPal and Zelle (any, all or none).
-- Still to build in Profile & Settings: editing the profile, and which payment handle to show first.
-- Settings:
-  - Reminder preferences (3 days before, 1 day before, when overdue, or off)
-  - Privacy (kept simple in the MVP)
-  - Change email, log out, delete account
+- **Profile** page: edit photo, first and last name, username (live check), phone and birthday.
+- **Preferences** page (each card saves on its own):
+  - Payment handles, plus **Show first**: which handle friends see first
+  - Reminders: separate switches for 3 days before, 1 day before and when overdue (all off = no reminders)
+  - Privacy: who can find me by username (**Everyone** or **Only my contacts**), and show my phone to contacts. Stored now; enforced when Contacts is built (Step 5).
+  - Account: change email (confirmation link), change password (email accounts; asks for the current one), log out, **delete account** (immediate and permanent; type your username to confirm; removes photos, then the login, and the profile goes with it)
 
 ## 2. Contacts
 - Add friends by username, then accept or decline friend requests.
@@ -207,7 +209,7 @@ Each step is something we build together, review, then commit.
 |---|---|---|
 | 0. Setup | 1 | Next.js + Supabase + Vercel project, `.gitignore`, environment variables, deployed placeholder page **(done)** |
 | 1. Foundation | 2 | Landing page, sign-up (Google, email + password), create profile, log in, forgot/reset password **(done)** |
-| | 3 | Profile & Settings: edit profile, photo and payment handles, reminder preferences, log out |
+| | 3 | Preferences and Profile: edit profile, photo and payment handles, reminders, privacy, account **(built)** |
 | | 4 | Navigation bar with the tabs (placeholder pages) |
 | 2. Social | 5 | Contacts: add friends by username, friends list |
 | | 6 | Groups: create a group, invite friends, roles |
@@ -226,9 +228,9 @@ Each step is something we build together, review, then commit.
 
 ## Current step
 
-Steps 1 and 2 are done and live (last update: 2026-11-09). The app frame is also built: every signed-in page shares `src/app/(app)/layout.tsx` (sidebar, top bar with live clock, phone drop-down menu). The dashboard shows the approved design with empty data; Group, Contacts, CommonTab AI, Documents & Receipts and Settings are "Coming soon" placeholders.
+Steps 1 and 2 are done and live (last update: 2026-11-09). The app frame is also built: every signed-in page shares `src/app/(app)/layout.tsx` (sidebar, top bar with live clock, phone drop-down menu). The dashboard shows the approved design with empty data; Group, Contacts, CommonTab AI and Documents & Receipts are "Coming soon" placeholders.
 
-**Next: Step 3, Profile & Settings.** Wait for Brian's instructions before starting.
+**Step 3 (Preferences and Profile) is built.** It needs `supabase/migrations/20261110000000_preferences.sql` run in Supabase. Step 4 (navigation) was covered by the app frame. **Next: Step 5, Contacts.** Wait for Brian's instructions before starting.
 
 Open questions:
 - CLAUDE.md and the planning doc disagree in places (5 vs 6 tabs, Settings, Steps 13/15, whose Zelle handle the button shows). Brian hasn't said which is current; the Google Doc also still says "magic link".

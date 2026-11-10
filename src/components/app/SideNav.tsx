@@ -87,7 +87,7 @@ export default function SideNav({ onNavigate }: { onNavigate?: () => void }) {
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">Payment handles</p>
             {anyHandle && (
-              <Link href="/settings" onClick={onNavigate} className="text-xs font-bold text-brand hover:underline">
+              <Link href="/preferences#payment-handles" onClick={onNavigate} className="text-xs font-bold text-brand hover:underline">
                 Edit
               </Link>
             )}
@@ -101,7 +101,7 @@ export default function SideNav({ onNavigate }: { onNavigate?: () => void }) {
                   <span className="min-w-0 truncate text-[#3E4A43]">{h.value}</span>
                 ) : (
                   <Link
-                    href="/settings"
+                    href="/preferences#payment-handles"
                     onClick={onNavigate}
                     className="font-semibold text-brand underline underline-offset-2 hover:text-brand-hover"
                   >
@@ -114,7 +114,7 @@ export default function SideNav({ onNavigate }: { onNavigate?: () => void }) {
         </section>
 
         <Link
-          href="/settings"
+          href="/profile"
           onClick={onNavigate}
           className="flex items-center gap-3 rounded-2xl bg-cream p-3 text-ink transition hover:bg-butter"
         >

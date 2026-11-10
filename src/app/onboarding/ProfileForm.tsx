@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Avatar from "@/components/Avatar";
+import { borderFor, HandleField, inputClass, Required } from "@/components/forms";
 import { createClient } from "@/lib/supabase/client";
+import { useUsernameAvailability } from "@/lib/useUsernameAvailability";
 import {
   AVATAR_MAX_BYTES,
   AVATAR_TYPES,
@@ -22,12 +24,7 @@ import {
 } from "@/lib/profile";
 import { createProfile, type CreateProfileState } from "./actions";
 
-type Availability = "idle" | "checking" | "available" | "taken" | "error";
 type FieldErrors = NonNullable<CreateProfileState["fieldErrors"]>;
-
-const inputClass =
-  "h-12 w-full rounded-xl border bg-white px-4 text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/20";
-const borderFor = (bad?: string) => (bad ? "border-warn focus:border-warn" : "border-line focus:border-brand");
 
 export default function ProfileForm({
   userId,
@@ -39,8 +36,6 @@ export default function ProfileForm({
   defaultLastName: string;
 }) {
   const [username, setUsername] = useState("");
-  // Last answer from the database: which name we asked about, and whether it's free.
-  const [lastCheck, setLastCheck] = useState<{ name: string; status: Availability } | null>(null);
   const [firstName, setFirstName] = useState(defaultFirstName);
   const [lastName, setLastName] = useState(defaultLastName);
   const [birthday, setBirthday] = useState("");
@@ -58,28 +53,7 @@ export default function ProfileForm({
   const fileInput = useRef<HTMLInputElement>(null);
 
   const normalized = normalizeUsername(username);
-  const usernameFormatError = normalized ? usernameProblem(normalized) : null;
-  const canCheck = Boolean(normalized) && !usernameFormatError;
-  const availability: Availability = !canCheck
-    ? "idle"
-    : lastCheck?.name === normalized
-      ? lastCheck.status
-      : "checking";
-
-  // Live "is this username free?" check, a moment after typing stops.
-  useEffect(() => {
-    if (!canCheck) return;
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      const { data, error } = await createClient().rpc("is_username_available", { candidate: normalized });
-      if (cancelled) return;
-      setLastCheck({ name: normalized, status: error ? "error" : data ? "available" : "taken" });
-    }, 400);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [normalized, canCheck]);
+  const { availability, formatError: usernameFormatError } = useUsernameAvailability(normalized);
 
   // Free the preview image's memory when it changes.
   useEffect(() => () => {
@@ -397,57 +371,3 @@ export default function ProfileForm({
   );
 }
 
-/** Red asterisk for required fields (screen readers already hear "required" from the input). */
-function Required() {
-  return (
-    <span className="text-warn" aria-hidden="true">
-      *
-    </span>
-  );
-}
-
-function HandleField({
-  id,
-  label,
-  prefix,
-  placeholder,
-  value,
-  onChange,
-  error,
-}: {
-  id: string;
-  label: string;
-  prefix?: string;
-  placeholder: string;
-  value: string;
-  onChange: (value: string) => void;
-  error?: string;
-}) {
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-semibold text-ink">
-        {label} <span className="font-normal text-muted">(optional)</span>
-      </label>
-      <div className={`flex h-12 items-center rounded-xl border bg-white focus-within:ring-2 focus-within:ring-brand/20 ${borderFor(error)}`}>
-        {prefix && <span className="pl-4 text-muted">{prefix}</span>}
-        <input
-          id={id}
-          autoCapitalize="none"
-          spellCheck={false}
-          maxLength={254}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          aria-invalid={Boolean(error)}
-          aria-describedby={error ? `${id}-error` : undefined}
-          className={`h-full min-w-0 flex-1 rounded-xl bg-transparent pr-4 text-ink placeholder:text-muted/70 focus:outline-none ${prefix ? "pl-1" : "pl-4"}`}
-        />
-      </div>
-      {error && (
-        <p id={`${id}-error`} className="mt-1 text-xs text-warn">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}

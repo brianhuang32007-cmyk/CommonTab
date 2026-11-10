@@ -9,9 +9,12 @@ export const MENU = [
   { href: "/documents", label: "Documents & Receipts", icon: DocumentIcon },
 ] as const;
 
-export const PREFERENCES = [{ href: "/settings", label: "Settings", icon: SettingsIcon }] as const;
+export const PREFERENCES = [{ href: "/preferences", label: "Preferences", icon: SettingsIcon }] as const;
+
+// Pages that aren't in the sidebar but still need a title.
+const OTHER_PAGES = [{ href: "/profile", label: "Profile" }] as const;
 
 export function pageTitle(pathname: string) {
-  const item = [...MENU, ...PREFERENCES].find((i) => pathname === i.href || pathname.startsWith(`${i.href}/`));
+  const item = [...MENU, ...PREFERENCES, ...OTHER_PAGES].find((i) => pathname === i.href || pathname.startsWith(`${i.href}/`));
   return item?.label ?? "CommonTab";
 }

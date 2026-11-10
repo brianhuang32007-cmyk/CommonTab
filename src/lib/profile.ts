@@ -95,3 +95,10 @@ export function nameProblem(name: string): string | null {
   if (n.length > 50) return "50 characters at most.";
   return null;
 }
+
+/** "+15551234567" → "(555) 123-4567". Anything else is returned unchanged. */
+export function formatUsPhone(stored: string | null) {
+  if (!stored) return "";
+  const m = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(stored);
+  return m ? `(${m[1]}) ${m[2]}-${m[3]}` : stored;
+}
