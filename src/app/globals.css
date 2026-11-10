@@ -31,3 +31,15 @@ body {
   color: var(--color-ink);
   font-family: var(--font-jakarta), Arial, Helvetica, sans-serif;
 }
+
+/* Word documents converted for the file viewer (document requests). */
+.doc-preview h1 { font-size: 1.6em; font-weight: 800; margin: 0.6em 0 0.4em; }
+.doc-preview h2 { font-size: 1.3em; font-weight: 800; margin: 0.6em 0 0.4em; }
+.doc-preview h3, .doc-preview h4 { font-size: 1.1em; font-weight: 700; margin: 0.6em 0 0.3em; }
+.doc-preview p { margin: 0 0 0.75em; }
+.doc-preview ul { list-style: disc; padding-left: 1.5em; margin: 0 0 0.75em; }
+.doc-preview ol { list-style: decimal; padding-left: 1.5em; margin: 0 0 0.75em; }
+.doc-preview table { border-collapse: collapse; margin: 0 0 0.75em; }
+.doc-preview td, .doc-preview th { border: 1px solid var(--color-line, #dde2da); padding: 4px 8px; vertical-align: top; }
+.doc-preview a { color: var(--color-brand, #2e6a45); text-decoration: underline; }
+.doc-preview img { max-width: 100%; height: auto; }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { createClient } from "@/lib/supabase/client";
+import type { DocumentRequestView } from "./documents";
 import type { PaymentRequestView } from "./requests";
 
 // Messages for one conversation: shapes, loading (newest first, older pages on request),
@@ -32,6 +33,8 @@ export type Message = {
   mentions: string[];
   /** Set when this message is a payment request's card. */
   payment_request?: PaymentRequestView | null;
+  /** Set when this message is a document request's card. */
+  document_request?: DocumentRequestView | null;
 };
 
 /** A file picked in the composer. It's uploaded right away so the person can see progress. */
@@ -88,6 +91,8 @@ export type MessagesState = {
   drop: (id: string) => void;
   /** Re-read a payment request's card (after confirming, or when a share changes). */
   refreshRequest: (requestId: string) => Promise<void>;
+  /** Re-read a document request's card (after an upload or review). */
+  refreshDocument: (requestId: string) => Promise<void>;
 };
 
 export function useMessages(supabase: Client, conversationId: string): MessagesState {
@@ -111,6 +116,16 @@ export function useMessages(supabase: Client, conversationId: string): MessagesS
       if (!data) return;
       const view = data as PaymentRequestView;
       setMessages((current) => current.map((m) => (m.payment_request?.id === requestId ? { ...m, payment_request: view } : m)));
+    },
+    [supabase],
+  );
+
+  const refreshDocument = useCallback(
+    async (requestId: string) => {
+      const { data } = await supabase.rpc("document_request_view", { req: requestId });
+      if (!data) return;
+      const view = data as DocumentRequestView;
+      setMessages((current) => current.map((m) => (m.document_request?.id === requestId ? { ...m, document_request: view } : m)));
     },
     [supabase],
   );
@@ -156,6 +171,15 @@ export function useMessages(supabase: Client, conversationId: string): MessagesS
         const req = (payload.new as { request_id?: string }).request_id;
         if (req && latest.current.some((m) => m.payment_request?.id === req)) refreshRequest(req);
       })
+      // Someone's part of a document request changed, or the request closed: refresh its card.
+      .on("postgres_changes", { event: "*", schema: "public", table: "document_recipients" }, (payload) => {
+        const req = (payload.new as { request_id?: string }).request_id;
+        if (req && latest.current.some((m) => m.document_request?.id === req)) refreshDocument(req);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "document_requests" }, (payload) => {
+        const req = (payload.new as { id?: string }).id;
+        if (req && latest.current.some((m) => m.document_request?.id === req)) refreshDocument(req);
+      })
       .subscribe((state) => {
         if (state !== "SUBSCRIBED") return;
         // Reconnected after a drop: catch up on anything missed.
@@ -169,7 +193,7 @@ export function useMessages(supabase: Client, conversationId: string): MessagesS
       clearTimeout(timer);
       supabase.removeChannel(channel);
     };
-  }, [supabase, conversationId, loadLatest, refreshRequest]);
+  }, [supabase, conversationId, loadLatest, refreshRequest, refreshDocument]);
 
   const loadOlder = useCallback(async () => {
     if (busyOlder.current || oldest.current === null) return;
@@ -197,11 +221,24 @@ export function useMessages(supabase: Client, conversationId: string): MessagesS
   const add = useCallback((m: Message) => setMessages((current) => merge(current, [m])), []);
   const drop = useCallback((id: string) => setMessages((current) => current.filter((m) => m.id !== id)), []);
 
-  return { status, messages, hasOlder, loadingOlder, loadOlder, retry, add, drop, refreshRequest };
+  return { status, messages, hasOlder, loadingOlder, loadOlder, retry, add, drop, refreshRequest, refreshDocument };
 }
 
 /** Uploads a chat file with progress. Uses the signed-in person's own session (never a secret key). */
 export function uploadChatFile(supabase: Client, path: string, file: File, onProgress: (fraction: number) => void) {
+  return uploadFile(supabase, "chat-files", path, file, file.type, "10 MB", onProgress);
+}
+
+/** Uploads a file to a private storage bucket with progress, as the signed-in person. */
+export function uploadFile(
+  supabase: Client,
+  bucket: "chat-files" | "request-documents",
+  path: string,
+  file: File,
+  contentType: string,
+  sizeLimit: string,
+  onProgress: (fraction: number) => void,
+) {
   const xhr = new XMLHttpRequest();
   let aborted = false;
   const promise = (async () => {
@@ -210,17 +247,17 @@ export function uploadChatFile(supabase: Client, path: string, file: File, onPro
     if (!token) throw new Error("You're signed out. Sign in again to attach files.");
     if (aborted) throw new Error("Cancelled");
     await new Promise<void>((resolve, reject) => {
-      xhr.open("POST", `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/chat-files/${path}`);
+      xhr.open("POST", `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/${bucket}/${path}`);
       xhr.setRequestHeader("Authorization", `Bearer ${token}`);
       xhr.setRequestHeader("apikey", process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!);
       xhr.setRequestHeader("x-upsert", "false");
-      xhr.setRequestHeader("Content-Type", file.type);
+      xhr.setRequestHeader("Content-Type", contentType);
       xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
       xhr.onload = () => {
         // Already there (a retry after the reply was lost) counts as uploaded.
         if (xhr.status >= 200 && xhr.status < 300) resolve();
         else if (xhr.status === 409 || /already exists|Duplicate/i.test(xhr.responseText)) resolve();
-        else reject(new Error(xhr.status === 413 ? "That file is too big (10 MB max)." : "Upload failed."));
+        else reject(new Error(xhr.status === 413 ? `That file is too big (${sizeLimit} max).` : xhr.status === 415 ? "That file type isn't allowed." : "Upload failed."));
       };
       xhr.onerror = () => reject(new Error("Upload failed. Check your connection."));
       xhr.onabort = () => reject(new Error("Cancelled"));

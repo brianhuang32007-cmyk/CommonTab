@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ContactRow } from "@/app/(app)/contacts/types";
+import type { DocumentRequestRow } from "@/app/(app)/group/documents";
 import type { PaymentRequestRow } from "@/app/(app)/group/requests";
 import { allAlerts, alertIsUnread, type AlertItem, type RequestEvent } from "@/lib/alerts";
 import { loadAlertReads, markAlertRead as saveAlertRead } from "@/lib/notificationReads";
@@ -46,7 +47,9 @@ type Notifications = {
   seenAt: string | null;
   /** Your open payment requests (the reminders come from these); null while loading. */
   paymentRows: PaymentRequestRow[] | null;
-  /** What happened on your requests lately. */
+  /** Your open document requests (upload and review tasks come from these). */
+  documentRows: DocumentRequestRow[];
+  /** What happened on your requests lately (payments and documents, newest first). */
   events: RequestEvent[];
   /** Your read marks: alert key → when you read it. */
   reads: Map<string, string>;
@@ -75,6 +78,7 @@ export function NotificationsProvider({ userId, children }: { userId: string; ch
   const [messages, setMessages] = useState<MessageAlert[]>([]);
   const [seenAt, setSeenAt] = useState<string | null>(null);
   const [paymentRows, setPaymentRows] = useState<PaymentRequestRow[] | null>(null);
+  const [documentRows, setDocumentRows] = useState<DocumentRequestRow[]>([]);
   const [events, setEvents] = useState<RequestEvent[]>([]);
   const [reads, setReads] = useState<Map<string, string>>(new Map());
   const [alertsFailed, setAlertsFailed] = useState(false);
@@ -83,11 +87,13 @@ export function NotificationsProvider({ userId, children }: { userId: string; ch
 
   const load = useCallback(async () => {
     const supabase = createClient();
-    const [contacts, alerts, payments, feed, marks] = await Promise.all([
+    const [contacts, alerts, payments, feed, documents, docFeed, marks] = await Promise.all([
       supabase.rpc("my_contacts"),
       supabase.rpc("my_message_alerts"),
       supabase.rpc("my_payment_requests"),
       supabase.rpc("my_request_events", { max_rows: 50 }),
+      supabase.rpc("my_document_requests"),
+      supabase.rpc("my_document_events", { max_rows: 50 }),
       loadAlertReads(supabase),
     ]);
     // Payment reminders: a failed first load shows an error; a failed refresh keeps what's shown.
@@ -100,7 +106,15 @@ export function NotificationsProvider({ userId, children }: { userId: string; ch
       setAlertsRefreshFailed(false);
       setPaymentRows((payments.data ?? []) as PaymentRequestRow[]);
     }
-    if (!feed.error) setEvents((feed.data ?? []) as RequestEvent[]);
+    // Document requests never fail the page; what's shown stays if they can't load.
+    if (!documents.error) setDocumentRows((documents.data ?? []) as DocumentRequestRow[]);
+    if (!feed.error || !docFeed.error) {
+      setEvents((current) => {
+        const pay = feed.error ? current.filter((e) => e.source !== "document") : ((feed.data ?? []) as RequestEvent[]);
+        const docs = docFeed.error ? current.filter((e) => e.source === "document") : ((docFeed.data ?? []) as RequestEvent[]);
+        return [...pay, ...docs].sort((a, b) => b.created_at.localeCompare(a.created_at));
+      });
+    }
     if (marks) setReads(marks);
     if (contacts.data) {
       setRequests(
@@ -149,6 +163,9 @@ export function NotificationsProvider({ userId, children }: { userId: string; ch
       .on("postgres_changes", { event: "*", schema: "public", table: "payment_shares" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "payment_requests" }, refresh)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "payment_share_events" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "document_requests" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "document_recipients" }, refresh)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "document_events" }, refresh)
       .subscribe();
 
     return () => {
@@ -160,8 +177,8 @@ export function NotificationsProvider({ userId, children }: { userId: string; ch
   }, [userId, load]);
 
   const alerts = useMemo(
-    () => allAlerts({ rows: paymentRows, events, contacts: requests, messages }),
-    [paymentRows, events, requests, messages],
+    () => allAlerts({ rows: paymentRows, docRows: documentRows, events, contacts: requests, messages }),
+    [paymentRows, documentRows, events, requests, messages],
   );
   const unreadAlerts = useMemo(() => alerts.filter((a) => alertIsUnread(a, seenAt, reads)), [alerts, seenAt, reads]);
   const unread = unreadAlerts.length;
@@ -202,6 +219,7 @@ export function NotificationsProvider({ userId, children }: { userId: string; ch
         unreadMessages,
         seenAt,
         paymentRows,
+        documentRows,
         events,
         reads,
         alertsFailed,

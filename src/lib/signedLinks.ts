@@ -12,7 +12,7 @@ const cache = new Map<string, { url: string; expires: number }>();
 /** Resolves with a link for each path in the bucket it could open (others are left out). */
 export async function signedLinks(
   supabase: Client,
-  bucket: "group-pictures" | "chat-files",
+  bucket: "group-pictures" | "chat-files" | "request-documents",
   paths: (string | null | undefined)[],
 ): Promise<Map<string, string>> {
   const now = Date.now();
@@ -33,4 +33,10 @@ export async function signedLinks(
     if (hit) links.set(p, hit.url);
   }
   return links;
+}
+
+/** A short-lived link that downloads the file under its own name (not cached). */
+export async function downloadLink(supabase: Client, bucket: "chat-files" | "request-documents", path: string, name: string) {
+  const { data } = await supabase.storage.from(bucket).createSignedUrl(path, 60 * 5, { download: name });
+  return data?.signedUrl ?? null;
 }

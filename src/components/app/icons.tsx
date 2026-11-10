@@ -208,3 +208,32 @@ export const ChevronDownIcon = (p: IconProps) => (
     <path d="m6 9 6 6 6-6" />
   </Svg>
 );
+export const UploadIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 15V4M7 9l5-5 5 5" />
+    <path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" />
+  </Svg>
+);
+export const DownloadIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 4v11M7 10l5 5 5-5" />
+    <path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" />
+  </Svg>
+);
+export const ZoomInIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-4-4M11 8v6M8 11h6" />
+  </Svg>
+);
+export const ZoomOutIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-4-4M8 11h6" />
+  </Svg>
+);
+export const FitWidthIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4" />
+  </Svg>
+);

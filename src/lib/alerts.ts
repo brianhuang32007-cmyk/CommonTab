@@ -3,6 +3,7 @@
 // payments are identified, searched and ranked.
 
 import type { ContactRow } from "@/app/(app)/contacts/types";
+import { docRef, docTypeLabel, documentHref, type DocumentRequestRow } from "@/app/(app)/group/documents";
 import { detailsHref, dollars, type PaymentRequestRow } from "@/app/(app)/group/requests";
 import type { MessageAlert } from "@/components/app/NotificationsContext";
 import { alertKey, isUnreadAlert } from "@/lib/notificationReads";
@@ -78,17 +79,72 @@ export function shareTasks(rows: PaymentRequestRow[] | null): Task[] {
   });
 }
 
+/** Your document requests that need you: upload what you were asked for, or review what arrived. */
+export function docTasks(rows: DocumentRequestRow[] | null): Task[] {
+  return (rows ?? []).flatMap((r): Task[] => {
+    const group = r.conversation_name ?? (r.conversation_kind === "dm" ? "Direct message" : "Group");
+    const base = {
+      readKey: alertKey.document(r.id),
+      category: "documents" as const,
+      title: r.title,
+      group,
+      due: r.due_date,
+      cents: 0,
+      at: r.created_at ?? null,
+      href: documentHref(r.conversation_id, r.id),
+    };
+    if (r.direction === "received" && (r.my_status === "requested" || r.my_status === "rejected")) {
+      const requester = [r.requester_first_name, r.requester_last_name].filter(Boolean).join(" ");
+      const what = r.my_status === "rejected" ? "Rejected, upload again" : `Upload ${docTypeLabel(r).toLowerCase()}`;
+      return [
+        {
+          ...base,
+          key: `upload-${r.id}`,
+          kind: "upload-document",
+          detail: `${what}${requester ? ` · Requested by ${requester}` : ""} · ${docRef(r.id)}`,
+        },
+      ];
+    }
+    if (r.direction === "sent" && r.waiting_count > 0) {
+      return [
+        {
+          ...base,
+          key: `review-${r.id}`,
+          kind: "review-document",
+          detail: `${r.waiting_count === 1 ? "1 document" : `${r.waiting_count} documents`} ready to review · ${docRef(r.id)}`,
+        },
+      ];
+    }
+    return [];
+  });
+}
+
 /* ---------- Updates on your requests ---------- */
 
-/** Something that happened on one of your requests (my_request_events). */
+/** Something that happened on one of your requests (my_request_events, or my_document_events
+ *  with source "document"). */
 export type RequestEvent = {
+  /** Set for document requests; payment events leave it out. */
+  source?: "document";
   id: number;
   request_id: string;
   conversation_id: string;
   title: string;
   conversation_name: string | null;
   conversation_kind: "group" | "dm";
-  kind: "confirmed" | "disputed" | "amount_changed" | "waived" | "paid" | "dispute_canceled";
+  kind:
+    | "confirmed"
+    | "disputed"
+    | "amount_changed"
+    | "waived"
+    | "paid"
+    | "dispute_canceled"
+    // Document requests:
+    | "submitted"
+    | "accepted"
+    | "rejected"
+    | "cant_provide"
+    | "cancelled";
   user_id: string;
   actor_id: string | null;
   user_first_name: string | null;
@@ -97,7 +153,16 @@ export type RequestEvent = {
   previous_cents: number | null;
   created_at: string;
   i_am_requester: boolean;
+  /** A rejection or can't-provide reason (document requests). */
+  note?: string | null;
 };
+
+/** Where an update links to, which read mark it uses, its tab, and a key unique across both feeds. */
+export const eventHref = (e: RequestEvent) =>
+  e.source === "document" ? documentHref(e.conversation_id, e.request_id) : detailsHref(e.conversation_id, e.request_id);
+export const eventReadKey = (e: RequestEvent) => (e.source === "document" ? alertKey.document(e.request_id) : alertKey.payment(e.request_id));
+export const eventCategory = (e: RequestEvent): Category => (e.source === "document" ? "documents" : "payments");
+export const eventKey = (e: RequestEvent) => `${e.source ?? "payment"}-event-${e.id}`;
 
 /** The event's title and details, from your point of view. */
 export function describeEvent(e: RequestEvent): { title: string; detail: string; tone: "done" | "info" | "warn" } {
@@ -122,6 +187,16 @@ export function describeEvent(e: RequestEvent): { title: string; detail: string;
       return { title: "Dispute resolved", detail: `${e.i_am_requester ? `${who}'s` : "Your"} payment was canceled`, tone: "done" };
     case "dispute_canceled":
       return { title: "Dispute canceled", detail: `${who} canceled their dispute; the share stays ${amt}`, tone: "info" };
+    case "submitted":
+      return { title: "Document received", detail: `${who} sent their document. Ready to review.`, tone: "info" };
+    case "accepted":
+      return { title: "Document accepted", detail: "Your document was accepted", tone: "done" };
+    case "rejected":
+      return { title: "Document rejected", detail: e.note ? `Reason: ${e.note}` : "Your document was rejected. Upload it again.", tone: "warn" };
+    case "cant_provide":
+      return { title: "Can't provide it", detail: e.note ? `${who}: ${e.note}` : `${who} can't provide the document`, tone: "warn" };
+    case "cancelled":
+      return { title: "Request canceled", detail: "Nothing more is needed", tone: "info" };
   }
 }
 
@@ -137,12 +212,14 @@ export type AlertItem =
 export function allAlerts(input: {
   rows: PaymentRequestRow[] | null;
   extraTasks?: Task[];
+  /** Your open document requests (their upload and review tasks). */
+  docRows?: DocumentRequestRow[] | null;
   events: RequestEvent[];
   contacts: ContactRow[];
   messages: MessageAlert[];
 }): AlertItem[] {
   const items: AlertItem[] = [
-    ...[...shareTasks(input.rows), ...(input.rows ? (input.extraTasks ?? []) : [])].map((t): AlertItem => ({
+    ...[...shareTasks(input.rows), ...docTasks(input.docRows ?? null), ...(input.rows ? (input.extraTasks ?? []) : [])].map((t): AlertItem => ({
       type: "task",
       key: `task-${t.key}`,
       readKey: t.readKey,
@@ -152,10 +229,10 @@ export function allAlerts(input: {
     })),
     ...input.events.map((e): AlertItem => ({
       type: "event",
-      key: `event-${e.id}`,
-      readKey: alertKey.payment(e.request_id),
+      key: eventKey(e),
+      readKey: eventReadKey(e),
       at: e.created_at,
-      category: "payments",
+      category: eventCategory(e),
       event: e,
     })),
     ...input.contacts.map((c): AlertItem => ({

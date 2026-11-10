@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNotifications } from "@/components/app/NotificationsContext";
-import type { PaymentSearchRow } from "@/lib/alerts";
+import { docTasks, type PaymentSearchRow } from "@/lib/alerts";
 import { createClient } from "@/lib/supabase/client";
 import AlertsScreen from "./AlertsScreen";
 
@@ -33,6 +33,8 @@ export default function AlertsView() {
     <AlertsScreen
       data={{
         rows: n.paymentRows,
+        // Upload and review tasks for document requests (the Documents tab).
+        extraTasks: docTasks(n.documentRows),
         events: n.events,
         contacts: n.requests,
         messages: n.messages,

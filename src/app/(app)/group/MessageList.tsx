@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
-import { CardIcon, CloseIcon, FileIcon, ReceiptIcon } from "@/components/app/icons";
+import { CardIcon, CheckIcon, CloseIcon, FileIcon, ReceiptIcon, UploadIcon } from "@/components/app/icons";
 import { paymentRef } from "@/lib/alerts";
 import { signedLinks } from "@/lib/signedLinks";
 import type { createClient } from "@/lib/supabase/client";
+import { docRef, docTypeLabel, documentHref, type DocumentRequestView } from "./documents";
 import { fileSize, type Attachment, type DraftFile, type MessagesState, type Outgoing } from "./messages";
 import { detailsHref, dollars, dueLabel, settleHref, SHARE_STATUS, type PaymentRequestView } from "./requests";
 import { personName, type Conversation, type Member } from "./types";
@@ -25,6 +26,8 @@ type Item = {
   outgoing?: Outgoing;
   /** A payment request's card (shown instead of the text). */
   request?: PaymentRequestView | null;
+  /** A document request's card (shown instead of the text). */
+  document?: DocumentRequestView | null;
 };
 
 export default function MessageList({
@@ -68,6 +71,7 @@ export default function MessageList({
       createdAt: m.created_at,
       saved: m.attachments,
       request: m.payment_request ?? null,
+      document: m.document_request ?? null,
       local: [],
     })),
     // Sent but not saved yet (or failed). Once saved, the real message takes its place.
@@ -336,7 +340,9 @@ function Bubble({
           />
         )}
 
-        {item.body && !item.request && (
+        {item.document && <DocumentCard request={item.document} me={me} members={members} />}
+
+        {item.body && !item.request && !item.document && (
           <p
             title={full}
             className={`rounded-2xl px-3.5 py-2 text-[15px] leading-6 break-words whitespace-pre-wrap [overflow-wrap:anywhere] ${
@@ -736,6 +742,148 @@ function RequestCard({
             </div>
           </div>
         ) : null)}
+    </div>
+  );
+}
+
+/** "Alex", "Alex and Sam", "Alex, Sam and Jordan". */
+function joinNames(names: string[]) {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** A document request in the chat: who is asking whom for what, and your next step.
+ *  People asked: an Upload Document box (or where their upload stands). The requester: progress
+ *  and a Review box when something is waiting. Everyone: View Details. */
+function DocumentCard({ request, me, members }: { request: DocumentRequestView; me: string; members: Map<string, Member> }) {
+  const iAsked = request.created_by === me;
+  const mine = request.my_status;
+  const href = documentHref(request.conversation_id, request.id);
+  const due = dueLabel(request.due_date);
+  const open = request.status === "open";
+  const first = (id: string | null) => (id ? (members.get(id)?.first_name ?? "A former member") : "A former member");
+  const asked = request.recipients.filter((r) => r.user_id !== me).map((r) => first(r.user_id));
+  const percent = request.recipient_count ? Math.round((request.accepted_count / request.recipient_count) * 100) : 0;
+
+  const label = iAsked ? (
+    <>
+      You&apos;re requesting <span className="font-bold">{request.title}</span> from {joinNames(asked)}
+    </>
+  ) : (
+    <>
+      {first(request.created_by)} is requesting <span className="font-bold">{request.title}</span> from{" "}
+      {mine ? (asked.length ? `you and ${joinNames(asked)}` : "you") : joinNames(asked)}
+    </>
+  );
+
+  const chip = iAsked
+    ? { text: "You requested", className: "bg-white text-brand" }
+    : mine
+      ? { text: "You're asked", className: "bg-butter-strong text-[#5C4A0B]" }
+      : { text: "Not in this request", className: "bg-white text-muted" };
+
+  // Your box: what to do next, or where your upload stands.
+  const box = (() => {
+    if (!open) return null;
+    if (iAsked) {
+      if (!request.waiting_count) return null;
+      return (
+        <Link href={href} className="flex min-h-12 items-center gap-2.5 rounded-xl bg-butter-strong px-3.5 py-2.5 font-bold text-[#5C4A0B] hover:bg-butter">
+          <FileIcon className="h-5 w-5 shrink-0" />
+          Review {request.waiting_count === 1 ? "1 document" : `${request.waiting_count} documents`}
+        </Link>
+      );
+    }
+    switch (mine) {
+      case "requested":
+        return (
+          <Link
+            href={`${href}#upload`}
+            className="flex min-h-12 items-center justify-center gap-2.5 rounded-xl border-2 border-dashed border-brand/40 bg-tint px-3.5 py-2.5 font-bold text-brand hover:border-brand"
+          >
+            <UploadIcon className="h-5 w-5 shrink-0" />
+            Upload Document
+          </Link>
+        );
+      case "submitted":
+        return (
+          <p className="flex min-h-12 items-center gap-2.5 rounded-xl bg-mist px-3.5 py-2.5 text-sm font-bold text-ink">
+            <FileIcon className="h-5 w-5 shrink-0 text-muted" />
+            Waiting for review
+          </p>
+        );
+      case "accepted":
+        return (
+          <p className="flex min-h-12 items-center gap-2.5 rounded-xl bg-tint px-3.5 py-2.5 text-sm font-bold text-brand">
+            <CheckIcon className="h-5 w-5 shrink-0" />
+            Accepted
+          </p>
+        );
+      case "rejected":
+        return (
+          <Link href={`${href}#upload`} className="flex min-h-12 items-center gap-2.5 rounded-xl bg-butter px-3.5 py-2.5 text-sm font-bold text-honey hover:bg-butter-strong">
+            <UploadIcon className="h-5 w-5 shrink-0" />
+            Rejected: Upload Again
+          </Link>
+        );
+      case "cant_provide":
+        return <p className="rounded-xl bg-mist px-3.5 py-2.5 text-sm font-bold text-muted">You said you can&apos;t provide it</p>;
+      default:
+        return null;
+    }
+  })();
+
+  return (
+    <div className="w-[min(340px,100%)] overflow-hidden rounded-2xl border border-line bg-white text-left">
+      <div className="flex items-center gap-2 bg-tint px-4 py-2.5">
+        <FileIcon className="h-[18px] w-[18px] text-ink" />
+        <p className="flex-1 text-[11px] font-bold tracking-[0.14em] text-ink uppercase">Document request</p>
+        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${chip.className}`}>{chip.text}</span>
+      </div>
+
+      <div className="px-4 pt-3">
+        <p className="flex flex-wrap items-center gap-2 text-lg leading-6 font-extrabold break-words">
+          {request.title}
+          {request.status === "complete" && <span className="rounded-full bg-brand px-2 py-0.5 text-[11px] font-bold text-white">Complete</span>}
+          {request.status === "cancelled" && <span className="rounded-full bg-mist px-2 py-0.5 text-[11px] font-bold text-muted">Canceled</span>}
+        </p>
+        <p className="font-mono text-[11px] font-bold text-muted">{docRef(request.id)}</p>
+        <p className="mt-0.5 text-[13px] text-muted">
+          {docTypeLabel(request)} ·{" "}
+          <span className={due.overdue && open ? "rounded-full bg-butter px-1.5 py-0.5 font-bold text-honey" : ""}>{due.text}</span>
+        </p>
+        <p className="mt-2 text-[14px] leading-5 text-ink">{label}</p>
+      </div>
+
+      {iAsked && request.recipient_count > 0 && (
+        <div className="mx-4 mt-3">
+          <div
+            className="h-2.5 overflow-hidden rounded-full bg-mist"
+            role="progressbar"
+            aria-label="Accepted so far"
+            aria-valuenow={percent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div className="h-full rounded-full bg-leaf" style={{ width: `${percent}%` }} />
+          </div>
+          <p className="mt-1.5 text-[13px] text-muted">
+            {request.accepted_count} of {request.recipient_count} accepted
+          </p>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2 px-4 pt-3 pb-4">
+        {box}
+        <Link
+          href={href}
+          className={`flex h-11 items-center justify-center rounded-xl text-sm font-bold ${
+            box ? "border border-line bg-white text-ink hover:bg-mist" : "bg-brand text-white hover:bg-brand-hover"
+          }`}
+        >
+          View Details
+        </Link>
+      </div>
     </div>
   );
 }

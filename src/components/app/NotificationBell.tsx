@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
-import { deadlineLabel, detailsHref } from "@/app/(app)/group/requests";
-import { describeEvent, TASK, type AlertItem } from "@/lib/alerts";
+import { deadlineLabel } from "@/app/(app)/group/requests";
+import { describeEvent, eventHref, TASK, type AlertItem } from "@/lib/alerts";
 import { useNow } from "@/lib/useNow";
-import { BellIcon, CardIcon, CheckIcon, DocumentIcon, ReceiptIcon } from "./icons";
+import { BellIcon, CardIcon, CheckIcon, DocumentIcon, FileIcon, ReceiptIcon } from "./icons";
 import { useNotifications, type MessageAlert } from "./NotificationsContext";
 
 // Alert bell in the top bar on every page. The same alerts as Alerts & Reminders (payment
@@ -159,7 +159,7 @@ export default function NotificationBell() {
                   return (
                     <li key={item.key} className="border-b border-[#EEF1EA]">
                       <Link
-                        href={detailsHref(e.conversation_id, e.request_id)}
+                        href={eventHref(e)}
                         onClick={() => setOpen(false)}
                         className="flex items-start gap-3 px-5 py-4 hover:bg-mist"
                       >
@@ -168,7 +168,13 @@ export default function NotificationBell() {
                             d.tone === "done" ? "bg-brand text-white" : d.tone === "warn" ? "bg-butter text-honey" : "bg-tint text-brand"
                           }`}
                         >
-                          {d.tone === "done" ? <CheckIcon className="h-5 w-5" /> : <CardIcon className="h-5 w-5" />}
+                          {d.tone === "done" ? (
+                            <CheckIcon className="h-5 w-5" />
+                          ) : e.source === "document" ? (
+                            <FileIcon className="h-5 w-5" />
+                          ) : (
+                            <CardIcon className="h-5 w-5" />
+                          )}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm text-ink">

@@ -3,12 +3,16 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
-import { CardIcon, CheckIcon, DocumentIcon, ReceiptIcon, SettingsIcon } from "@/components/app/icons";
+import { CardIcon, CheckIcon, DocumentIcon, FileIcon, ReceiptIcon, SettingsIcon } from "@/components/app/icons";
 import type { MessageAlert } from "@/components/app/NotificationsContext";
 import type { ContactRow } from "@/app/(app)/contacts/types";
 import { deadlineLabel, detailsHref, dollars, stamp, type PaymentRequestRow } from "@/app/(app)/group/requests";
 import {
   describeEvent,
+  eventCategory,
+  eventHref,
+  eventKey,
+  eventReadKey,
   paymentRef,
   rankSearch,
   searchGroup,
@@ -255,10 +259,11 @@ export default function AlertsScreen({
     })),
     ...events.map((e): Update => {
       const d = describeEvent(e);
+      const doc = e.source === "document";
       return {
-        key: `event-${e.id}`,
-        readKey: alertKey.payment(e.request_id),
-        category: "payments",
+        key: eventKey(e),
+        readKey: eventReadKey(e),
+        category: eventCategory(e),
         at: e.created_at,
         node: (fresh) => (
           <UpdateRow
@@ -269,7 +274,7 @@ export default function AlertsScreen({
                   d.tone === "done" ? "bg-brand text-white" : d.tone === "warn" ? "bg-butter text-honey" : "bg-tint text-brand"
                 }`}
               >
-                {d.tone === "done" ? <CheckIcon className="h-5 w-5" /> : <CardIcon className="h-5 w-5" />}
+                {d.tone === "done" ? <CheckIcon className="h-5 w-5" /> : doc ? <FileIcon className="h-5 w-5" /> : <CardIcon className="h-5 w-5" />}
               </span>
             }
             title={
@@ -281,8 +286,8 @@ export default function AlertsScreen({
           >
             <p className="mt-0.5 text-sm text-muted">{d.detail}</p>
             <Go
-              href={detailsHref(e.conversation_id, e.request_id)}
-              readKey={alertKey.payment(e.request_id)}
+              href={eventHref(e)}
+              readKey={eventReadKey(e)}
               onOpen={onOpen}
               className="mt-1 inline-flex min-h-9 items-center text-sm font-bold text-brand hover:underline"
             >

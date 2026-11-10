@@ -93,7 +93,7 @@ Rules:
 **Type and shapes:** Plus Jakarta Sans. Page titles 28–32px ExtraBold (800); card titles 18–20px ExtraBold; body 14–16px; small labels 11–12px Bold, uppercase with wide letter spacing. Cards are white with a 1px `line` border and 20–24px corners; buttons and inputs are 44–52px tall with 10–14px corners; badges and chips are fully rounded. Touch targets at least 44px.
 
 **Layout and names:**
-- **Desktop:** left sidebar with the logo; **Menu** (Dashboard, Group, Contacts, CommonTab AI, Document Drafting, Alerts & Reminders) and **Preferences** (Preferences, Log out); payment handles box (all three providers with their logos; missing ones show an underlined **Add handle** link) and profile card at the bottom. The profile card opens the **Profile** page. Top bar: page title on the left, a large live clock with the date in the center, the **alert bell** on the right, on every page (on phones it sits in the header). The bell opens a fixed-size (380×440) drop-down of recent **alerts** (the app calls notifications "alerts" everywhere) that scrolls when full; for now alerts are only new contact requests, with Accept and Decline. Unread ones show a red count on the bell.
+- **Desktop:** left sidebar with the logo; **Menu** (Dashboard, Group, Contacts, CommonTab AI, Document Drafting, Alerts & Reminders) and **Preferences** (Preferences, Log out); payment handles box (all three providers with their logos; missing ones show an underlined **Add handle** link) and profile card at the bottom. The profile card opens the **Profile** page. Top bar: page title on the left, a large live clock with the date in the center, the **alert bell** on the right, on every page (on phones it sits in the header). The bell opens a fixed-size (380×440) drop-down of recent **alerts** (the app calls notifications "alerts" everywhere) that scrolls when full. It shows **only unread alerts** (payment reminders, updates on your requests, new chat messages, contact requests with Accept and Decline), with **Mark all as read** and **View All Alerts** (opens Alerts & Reminders). Opening the bell doesn't mark anything read. Unread ones show a red count on the bell.
 - **Phone:** top bar with logo mark, title, action icon and profile photo (opens Profile); bottom tabs Home, Group, Contacts, AI, Docs.
 - **CommonTab AI** always uses the lightning-bolt icon and can be collapsed to an "Ask CommonTab AI" button. It drafts and suggests; the user taps to send.
 - Button labels use Title Case for main actions: **Add Contact**, **Create Group**.
@@ -111,11 +111,21 @@ Rules:
 | **Contacts** | Friends list, adding friends by username |
 | **CommonTab AI** | The AI chatbot (lightning icon) |
 | **Document Drafting** (`/documents`) | The AI drafting tool (see section 7) |
-| **Alerts & Reminders** (`/notifications`) | All alerts (contact requests for now) and payment reminders. The bell shows the recent ones. |
+| **Alerts & Reminders** (`/notifications`) | Every alert and reminder, read or unread, plus payment search (see "Alerts & Reminders" below). The bell shows only the unread ones. |
 | **Preferences** | Profile summary with **Edit Profile** (opens the separate **Profile** page), payment handles, reminders, privacy, account. |
 | **Profile** (`/profile`) | Edit photo, name, username, phone and birthday. Opened from Edit Profile or the sidebar's profile card. |
 
 Tab names follow the approved dashboard design (they used to be Chats, Agent and Documents). The planning doc still uses the old names.
+
+## Alerts & Reminders (built 2026-11-10)
+- **One live alert source** for the whole app (`NotificationsContext`): payment reminders, updates on your requests, read marks, contact requests and chats load once and stay live, so the bell, this page, the tab badges and the sidebar always agree.
+- **Header:** short subtitle, **Mark all as read** (Retry if saving fails), **Settings** (opens Preferences). Tabs **All / Payments / Documents** with unread counts, and an **Unread only** switch ("No unread notifications."). The page keeps its tab, filter, sort and scroll when you come back.
+- **Action needed:** your open tasks (Confirm your share, Pay your share, In dispute; document tasks come with Step 12), each with a deadline label ("2 days overdue", "Due today", "Due tomorrow", "Due Nov 13", "No due date") and a button (View request, Upload receipt, Upload document, Review document, Review payment). Sort **Earliest / Latest** (no date last). Colors: overdue honey on butter, today/tomorrow amber, later pale green, never red. Loading placeholders, "You're all caught up.", and "Couldn't load reminders" with Retry.
+- **Recent updates:** what happened on your requests (confirmed, disputed, amount changed, waived, dispute canceled, paid), newest first, from the last 30 days. Your own actions are left out, except your completed payments.
+- **Read marks:** green dots for unread. Opening an alert's destination (e.g. the payment's Details page) marks it read; tasks stay in Action needed until they're done.
+- **Payment IDs:** each payment request has a short ID like **PR-CD1C93** (made from its database id, nothing stored). It shows on the chat card, the Details page (with Copy), reminders and search. Individual payments keep their transaction IDs (**CT-…**).
+- **Payment search** (Payments tab): by PR-…, CT-…, title, group or person, over every request you sent or are in, open or fully paid. Results are grouped and ranked **Pending confirmation → Paid → Confirmed, not paid yet → Disputed → Waived**, then soonest due date.
+- **Code:** `src/lib/alerts.ts` (the rules: tasks, updates, unread, payment IDs, search ranking), `src/lib/notificationReads.ts`, `src/components/app/NotificationsContext.tsx`, `NotificationBell.tsx`, `src/app/(app)/notifications/` (`AlertsScreen.tsx` is the UI, `AlertsView.tsx` connects it). Local demo with made-up data: `http://localhost:3000/demo/alerts` (dev only, never touches the database).
 
 ## 1. Accounts, profile and preferences
 - Sign up and log in with Supabase: **Google**, or **email and password** (8+ characters, email must be confirmed). Log in page has **Forgot password?** → email link → **Reset password**.
@@ -148,7 +158,7 @@ Tab names follow the approved dashboard design (they used to be Chats, Agent and
 ## 4. Payment requests (tagged)
 - Create one from a chat: two buttons sit just above the message box, **Request Payment** and **Request Document** (decided 2026-11-10).
 - **Only the group's owner and organizers can request a payment** (Request Payment is hidden for members, and the database enforces it). **Anyone in the group can request a document.**
-- Each button opens a **separate page with a form** (decided 2026-11-10). The **Request Payment** form has: title, total (fills itself in from custom amounts if left empty), due date, receipt, **add people** (the group's members, always shown, each with an Add button, plus Select All), an **"Include myself in the payment"** checkbox (you can't add yourself otherwise; your own share counts as paid), and the split. The **Request Document** form still has only the title (not saved yet).
+- Each button opens a **separate page with a form** (decided 2026-11-10). The **Request Payment** form has: title, total (fills itself in from custom amounts if left empty), due date, receipt, **add people** (the group's members, always shown, each with an Add button, plus Select All), an **"Include myself in the payment"** checkbox (you can't add yourself otherwise; your own share counts as paid), and the split. The **Request Document** form has: title, document type, instructions (optional), due date (optional) and who sends it (see section 6).
 - **Each payment request and each document request has its own separate page with its own link** (decided 2026-11-10). The chat card's Details button, the group's Requests tab, alerts and the Dashboard all open that page.
 - **After it's made, a payment request goes public in the chat** as a card and appears in each tagged person's Requests list (decided 2026-11-10). The card shows a chip saying where you stand (You requested / You're paying / Not in this request), the **total**, the **due date**, a **Digital receipt available** label when there is one, a progress bar ("1 of 4 settled"), and **Details** plus the payer's next step. The requester or the group owner can delete it with the × (confirm first). Cards update live when any share changes.
   - **The requester** sees how much they're still owed and **each person's status** (Pending, Confirmed, Paid, plus Disputed or Waived). Everyone else sees who has paid and who hasn't.
@@ -176,7 +186,7 @@ Share status: `Pending → Confirmed → Paid`, with `Disputed` and `Waived` as 
   - **Negotiation:** the current proposal with **Accept** / **Counter** (and **Keep Original Amount** for the requester); **Propose a new share** (either side); **Propose Canceling My Payment** (the disputer only); **Cancel Dispute** (the disputer only); **History** of every proposal and how it ended; **Outcome** once resolved.
 - Rules: one open proposal at a time (a newer one replaces yours or counters theirs; old ones stay in history). Amounts are positive whole cents. **Accept** a new amount → the share changes and goes back to Pending (confirm again). **Accept** a cancel → the share is **Waived** (owes nothing; leaves progress and "still owed"). **Keep Original Amount** → the share stays Disputed. **Cancel Dispute** (the person who started it) → the share keeps its amount and goes back to Pending.
 - **Private:** only the requester and the disputing person see the reason, chat and proposals. The group sees only the status and Activity lines (no reasons).
-- Not built: files in the dispute chat; alerts for disputes. The request total doesn't change when a share changes or is waived.
+- Not built: files in the dispute chat; alerts for new dispute messages and proposals (disputes and their outcomes do show in Recent updates). The request total doesn't change when a share changes or is waived.
 
 **Settle: simulated payments** (Step 11, built 2026-11-10; Brian's call). **No real money moves and no outside app opens; every payment is accepted.** CommonTab still holds no balances or wallets; a payment is only a record of who paid whom.
 - Settle page (`…/settle`), confirmed shares only: **1. Choose a payment method**: only methods **already on the payer's account** (Venmo / PayPal / Zelle, and that the requester takes if they've added any; the requester's preferred first). With none, it links to Preferences to add a handle. → **2. Review and authorize** (amount, recipient's handle, your handle, an editable note) → **Confirm Demo Payment** → **3. Processing** (a progress bar with random pauses, 3 to 7 seconds) → **Payment Complete** with a receipt (amount, method, recipient, transaction ID `CT-…`, time).
@@ -185,16 +195,29 @@ Share status: `Pending → Confirmed → Paid`, with `Disputed` and `Waived` as 
 - **Local demo:** `http://localhost:3000/demo/settle` walks through the payer's screens with made-up people and no sign-in, next to what the requester sees (statuses, still owed, progress, reminders), with **Reset Demo**. It only exists under `npm run dev` (not found on the live site) and never touches the database.
 - Real in-app payments aren't possible with Venmo, PayPal or Zelle (no public payment APIs), and Stripe lists peer-to-peer money transmission as restricted, so real payments stay after the MVP.
 
-## 6. Document requests and AI check (inside requests)
-- In a chat, anyone can use **Request Document** and tag someone ("@Alex I need the receipt for gas"). Choose a document type and an optional deadline.
-- The tagged person uploads the photo or file.
-- **AI check:**
-  - Confirms the upload matches the requested type
-  - Pulls out key details (vendor, date, total, line items)
-  - Writes a short summary
-- Call it an "AI check," not proof the document is genuine. AI can catch wrong or blurry documents but can't reliably detect fakes.
-- The requester **accepts** or **rejects** it. If rejected, the tagged person can upload again.
-- Status: `Requested → Uploaded → AI checked → Accepted`, or `Rejected` (then back to Uploaded).
+## 6. Document requests and AI Verify (inside requests)
+Built 2026-11-10 (Brian's calls). Migration `20261110220000_document_requests.sql`.
+- **Who:** **anyone in a group** (owner, organizers, members) can use **Request Document**, and it works in **DMs** too (the other person is the one asked). The requester picks **one or more members**; each gets their own part and status.
+- **Form** (`…/request/document`): **title**, **document type** (Receipt, Invoice, Spending records, Signed form or waiver, Ticket or booking, Proof of payment, Other with your own name), **instructions** (optional, 500 characters), **due date** (optional), and **who sends it** (Add buttons and Select All, like Request Payment). **Send Request** posts the card and tags everyone asked.
+- **Chat card:** "Document request" header, the title with its ID (**DR-…**), type and due date, and the label **"<Requester> is requesting <title> from you"** (or "from <names>"; the requester sees "You're requesting … from …"). Below it, one box and **View Details**:
+  - **People asked:** **Upload Document** (opens the request page at the upload). After uploading it becomes **Waiting for review**, **Accepted** (green) or **Rejected: Upload Again** (yellow); or "You said you can't provide it".
+  - **The requester:** a progress bar ("1 of 3 accepted") and a **Review** box when something is waiting.
+  - **Everyone else:** the label and View Details only.
+- **Request page** (`/group/<chat>/documents/<request>`): header (status Open / Complete / Canceled, title, Request ID with Copy, type, due date, who asked, instructions), your part, **Who's sending** (each person's status), what's been sent, and **Activity**.
+  - **People asked:** upload up to **5 files** at once (**Attach a File** or **Take a Photo**; PDF, photos, Word, Excel, PowerPoint, CSV or text; **15 MB each**), an optional note, optional **AI Verify** before sending, then **Submit Document**. **Replace File** works until it's reviewed. After a rejection they see the reason and upload again. **Can't Provide** (with a required reason) is there before sending or after a rejection.
+  - **The requester:** each upload with its files (open in the viewer), the note, **AI Verify**, and **Accept** or **Reject** (with a required reason). **Cancel Request** (confirm first; files already sent stay for the two people). Replaced uploads sit under "Earlier uploads".
+- **Statuses** per person: `Requested → Ready to review (submitted) → Accepted`, or `Rejected` (upload again) or `Can't provide`. The request is **Complete** when everyone is accepted or can't provide.
+- **Files** live in CommonTab's own private storage (bucket `request-documents`, path `<request>/<uploader>/<upload>/<file>`). **Only the requester and the person who uploaded a file can open it**; the group sees statuses only. Drafts (not sent yet) are only the uploader's.
+- **File viewer** (`…/documents/<request>/files/<file>`): CommonTab's own viewer on its own page, with **Download**, the file name, who sent it and when, and arrows between files in the same upload.
+  - **PDF:** PDF.js (`pdfjs-dist`), page by page: page arrows, "Page 2 of 5", zoom in and out, **Fit width**.
+  - **Photos:** zoom and fit (HEIC shows Download where the browser can't display it).
+  - **Word (.docx):** converted in the browser into a page preview (`mammoth`). **Excel (.xlsx) and CSV:** shown as tables with sheet tabs (`read-excel-file`). **Text:** as text.
+  - **Anything else** (old .doc or .xls, PowerPoint): a file card with **Download**.
+- **AI Verify** (Step 13, built with this): runs **only when clicked**, by the **requester** (on what was sent) or the **uploader before submitting**. Route `src/app/api/ai/document/route.ts` reads the files from storage with the person's own session, sends PDFs and photos to the model and turns Word, Excel, CSV and text into plain text. It returns a verdict (**Matches the request / Partly matches / Doesn't look like what was asked / Couldn't read it**), the reason, what it looks like, the **key details** and a **summary**. 20 checks per person in any 24 hours, logged in `ai_calls` (feature `document`). Each person sees **only the AI checks they ran themselves**, so nobody can show the other side a made-up result.
+  - Example: a club organizer asks the chair for a PDF of spending records; AI Verify confirms it's spending records, lists the key data and summarizes it. The requester then reviews and decides. **Manual review without AI Verify always works.**
+  - Call it an "AI check," not proof the document is genuine. AI can catch wrong or blurry documents but can't reliably detect fakes. AI only reads and suggests; the requester decides.
+- **Alerts:** people asked get an **Upload document** task (also after a rejection), the requester gets **Review document** when something arrives; Recent updates show "Document received", "Document accepted", "Document rejected" (with the reason), "Can't provide it" and "Request canceled". All on the Documents tab and in the bell while unread. Opening the request page marks them read. The group's **Requests** tab lists document requests next to payments.
+- **Code:** `src/app/(app)/group/documents.ts` (types, labels, links, file rules), `request/[kind]/DocumentForm.tsx`, `MessageList.tsx` (`DocumentCard`), `[chatId]/documents/[requestId]/` (`DocumentDetails.tsx`, `parts.tsx` for upload, review and AI results, `files/[fileId]/FileViewer.tsx`).
 
 ## 7. Documents tab: the AI drafting tool
 - Paste a message ("cabin was $510 split 6 ways, due Fri") or upload a receipt.
@@ -248,7 +271,7 @@ Each step is something we build together, review, then commit.
 | 3. Money | 9 | Payment requests with equal and custom splits **(done)** |
 | | 10 | Confirm, dispute and dispute threads **(done)** |
 | | 11 | Settlement **(done as simulated in-app payments; no real money)** |
-| 4. Documents | 12 | Document requests and uploads |
+| 4. Documents | 12 | Document requests and uploads **(built; live test pending)** |
 | | 13 | AI receipt tools inside requests: scan and split, AI check on uploads |
 | 5. Dashboard | 14 | Dashboard: owe/owed/overdue and progress bars |
 | 6. AI | 15 | Documents tab: AI drafting with follow-up questions |
@@ -258,7 +281,7 @@ Each step is something we build together, review, then commit.
 
 ## Current step
 
-Last update: 2026-11-10. Steps 1 to 3, 5 to 7, 9 to 11 and the first part of Step 16 are done and live (Step 4 is covered by the app frame in `src/app/(app)/layout.tsx`). Contacts still needs a live test with two accounts.
+Last update: 2026-11-10. Steps 1 to 3, 5 to 7, 9 to 11, Alerts & Reminders and the first part of Step 16 are done and live (Step 4 is covered by the app frame in `src/app/(app)/layout.tsx`). Contacts still needs a live test with two accounts.
 
 **Done: Steps 6 and 7, Groups and chats** (migrations `20261110030000` to `20261110090000` have all been run). Code is in `src/app/(app)/group/`. Groups with owner, organizer and member roles; a Details window (members, roles, Invite Contacts with search, Edit Group, Delete Group, Make Owner); DMs; chat with date lines, older messages on scroll, live updates, attachments (JPG, PNG, WebP or PDF, up to 5 at 10 MB each, private to members) and @mentions; an "@ You" badge on chats with unread mentions; new messages in the alert bell; and the unread count on the Group tab. Group pictures and chat files are private and open through short-lived links (`src/lib/signedLinks.ts`). Every write goes through checked database functions, and app-made ids stop duplicates on retry.
 
@@ -282,9 +305,13 @@ Known gaps from Steps 6 and 7:
 - `src/app/(app)/group/[chatId]/payments/[requestId]/`: `RequestDetails.tsx`, `DisputePanel.tsx` (dispute list and `useMyDisputes`), `dispute/` (start-a-dispute form), `disputes/[disputeId]/DisputeRoom.tsx` (the dispute page), `settle/` (`SettlePanel.tsx` is the shared payment UI; `SettleView.tsx` connects it to the database).
 - `src/app/demo/settle/`: the local no-sign-in demo.
 
-Still to test with a second account (e.g. @briantest): paying a share end to end, and cancelling a dispute. A full negotiation (propose, decline, counter, accept) has been tested.
+Tested with @briantest: a full negotiation (propose, decline, counter, accept), cancelling a dispute, and confirming and paying a share end to end.
 
-**Next:** Brian's call. Remaining: Step 12 (document requests), 13 (AI check on uploads), 14 (Dashboard money numbers), 15 (Documents tab), the rest of 16 (AI tools for requests: what you owe, who still owes; answer cards in `src/app/(app)/ai/blocks.tsx`), 17 (reminders). Build one piece at a time and plan each piece with Brian before writing code.
+**Done: Alerts & Reminders** (2026-11-10; migrations `20261110180000` to `20261110210000` have all been run; live). See "Alerts & Reminders" above. Payment search was checked on the live site (by title and by CT- ID). Still to test with real data: the bell filling with new unread payment alerts when someone else acts on your request, and the search ranking across groups (only checked in `/demo/alerts` so far).
+
+**Built: Step 12, Request Document, with AI Verify from Step 13** (2026-11-10; migration `20261110220000_document_requests.sql`). See section 6. Still to test with a second account (e.g. @briantest): uploading, AI Verify on real files, accept and reject, Can't Provide, and the viewer with each file type.
+
+**After that:** 13 (the AI Verify part is built; scan and split stays with Request Payment), 14 (Dashboard money numbers), 15 (Documents tab), the rest of 16 (AI tools for requests: what you owe, who still owes; answer cards in `src/app/(app)/ai/blocks.tsx`), 17 (reminders). Build one piece at a time and plan each piece with Brian before writing code.
 
 Rules that still apply: amounts in whole cents and all math in plain code; money states never use red ("you owe" is ink, overdue and disputed are honey on butter); every write goes through checked database functions with app-made ids so retries can't duplicate; CommonTab never holds money.
 
@@ -292,7 +319,7 @@ Open questions:
 - AI bot: should conversations be saved to the database (so they survive a reload and sync across devices)?
 - Groups: what happens when the owner deletes their account?
 - Payment requests: can either person request a payment in a DM (hidden there for now)? Can a request be edited after it's sent? Should the request total change when a dispute changes or waives a share?
-- Disputes: files in the dispute chat, and alerts for disputes and payments?
+- Disputes: files in the dispute chat, and alerts for new dispute messages and proposals?
 - Payments: save the payment note and the payer's handle so the requester sees them?
-- Request Document: its fields (title only so far, not saved).
+- Document requests: can a request be edited after it's sent (add people, change the due date)? Should the group owner be able to cancel someone else's request?
 - What's the scope of "AI helps fill out documents," and is it in the MVP?

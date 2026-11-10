@@ -3,17 +3,15 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeftIcon, FileIcon } from "@/components/app/icons";
 import { useProfile } from "@/components/app/ProfileContext";
 import { createClient } from "@/lib/supabase/client";
 import { titleOf, type Conversation } from "../../../types";
+import DocumentForm from "./DocumentForm";
 import PaymentForm from "./PaymentForm";
 
 // The Request Payment and Request Document pages, opened from the buttons above a chat's
-// message box. Request Payment is the full form (PaymentForm). Request Document only asks
-// for a title so far, and isn't saved or sent yet.
-
-const TITLE_MAX = 80;
+// message box: PaymentForm (owner and organizers, groups only) and DocumentForm (anyone,
+// groups and DMs).
 
 type Kind = "payment" | "document";
 const COPY: Record<Kind, { heading: string; placeholder: string; who: string }> = {
@@ -29,7 +27,6 @@ export default function RequestForm() {
   const { id: me } = useProfile();
   const supabase = useMemo(() => createClient(), []);
   const [state, setState] = useState<State>({ status: "loading" });
-  const [title, setTitle] = useState("");
 
   useEffect(() => {
     let live = true;
@@ -70,63 +67,7 @@ export default function RequestForm() {
   }
 
   if (kind === "payment") return <PaymentForm chat={chat} me={me} chatTitle={chatTitle} />;
-  const Icon = FileIcon;
-
-  return (
-    <div className="mx-auto w-full max-w-[640px]">
-      <Link href={back} className="inline-flex h-11 items-center gap-1 text-sm font-bold text-brand">
-        <ChevronLeftIcon className="h-4 w-4" />
-        Back to {chatTitle}
-      </Link>
-
-      <form onSubmit={(e) => e.preventDefault()} className="mt-2 rounded-3xl border border-line bg-white p-6 sm:p-7">
-        <div className="flex items-center gap-3.5">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-tint text-brand">
-            <Icon className="h-6 w-6" />
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-[26px] font-extrabold tracking-tight">{copy.heading}</h2>
-            <p className="truncate text-sm text-muted">In {chatTitle}</p>
-          </div>
-        </div>
-
-        <label className="mt-6 flex flex-col gap-1.5">
-          <span className="flex justify-between text-sm font-bold">
-            <span>
-              Title <span className="text-warn">*</span>
-            </span>
-            <span className="font-medium text-muted">
-              {title.length}/{TITLE_MAX}
-            </span>
-          </span>
-          <input
-            autoFocus
-            value={title}
-            onChange={(e) => setTitle(e.target.value.slice(0, TITLE_MAX))}
-            maxLength={TITLE_MAX}
-            required
-            placeholder={copy.placeholder}
-            className="h-12 rounded-xl border border-line bg-white px-3.5 text-base outline-none placeholder:text-muted focus:border-brand focus:ring-3 focus:ring-brand/15"
-          />
-        </label>
-
-        <div className="mt-6 flex flex-wrap items-center justify-end gap-2.5 border-t border-line pt-5">
-          <p className="mr-auto text-[13px] text-muted">More details and sending come next.</p>
-          <Link href={back} className="flex h-12 items-center rounded-xl border border-line bg-white px-5 font-bold text-ink hover:bg-mist">
-            Cancel
-          </Link>
-          <button
-            type="submit"
-            disabled
-            title="Sending requests comes next"
-            className="h-12 rounded-xl bg-brand px-5 font-bold text-white disabled:cursor-not-allowed disabled:bg-line disabled:text-muted"
-          >
-            Send Request
-          </button>
-        </div>
-      </form>
-    </div>
-  );
+  return <DocumentForm chat={chat} me={me} chatTitle={chatTitle} />;
 }
 
 function Notice({ title, text, back }: { title: string; text: string; back: string }) {
