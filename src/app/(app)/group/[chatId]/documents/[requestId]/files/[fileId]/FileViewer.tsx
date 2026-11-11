@@ -81,7 +81,6 @@ export default function FileViewer() {
   }
 
   const { file, url } = state;
-  const kind = previewKind(file);
   const index = file.siblings.findIndex((s) => s.id === file.id);
   const prev = index > 0 ? file.siblings[index - 1] : null;
   const next = index >= 0 && index < file.siblings.length - 1 ? file.siblings[index + 1] : null;
@@ -136,15 +135,22 @@ export default function FileViewer() {
       </header>
 
       <div className="mt-3">
-        {kind === "pdf" && <PdfView url={url} />}
-        {kind === "image" && <ImageView url={url} name={file.name} onDownload={download} />}
-        {kind === "word" && <WordView url={url} onDownload={download} />}
-        {kind === "sheet" && <SheetView url={url} csv={file.name.toLowerCase().endsWith(".csv")} onDownload={download} />}
-        {kind === "text" && <TextView url={url} />}
-        {kind === "none" && <NoPreview text={`There's no preview for this kind of file (${fileKindLabel(file)}).`} onDownload={download} />}
+        <FilePreview file={file} url={url} onDownload={download} />
       </div>
     </div>
   );
+}
+
+/** The right viewer for a file: PDF pages, a zoomable photo, a Word or spreadsheet preview, text,
+ *  or a Download card for anything else. Also used for files sent in chats. */
+export function FilePreview({ file, url, onDownload }: { file: { name: string; mime_type: string }; url: string; onDownload: () => void }) {
+  const kind = previewKind(file);
+  if (kind === "pdf") return <PdfView url={url} />;
+  if (kind === "image") return <ImageView url={url} name={file.name} onDownload={onDownload} />;
+  if (kind === "word") return <WordView url={url} onDownload={onDownload} />;
+  if (kind === "sheet") return <SheetView url={url} csv={file.name.toLowerCase().endsWith(".csv")} onDownload={onDownload} />;
+  if (kind === "text") return <TextView url={url} />;
+  return <NoPreview text={`There's no preview for this kind of file (${fileKindLabel(file)}).`} onDownload={onDownload} />;
 }
 
 function FileStep({ href, label, children }: { href: string | null; label: string; children: React.ReactNode }) {
@@ -503,7 +509,13 @@ function parseCsv(text: string): Sheet["data"] {
 }
 
 const cellText = (c: Sheet["data"][number][number]) =>
-  c === null || c === undefined ? "" : c instanceof Date ? c.toLocaleDateString("en-US") : String(c);
+  c === null || c === undefined
+    ? ""
+    : c instanceof Date
+      ? c.toLocaleDateString("en-US")
+      : typeof c === "number"
+        ? c.toLocaleString("en-US", { maximumFractionDigits: 2 })
+        : String(c);
 
 function SheetView({ url, csv, onDownload }: { url: string; csv: boolean; onDownload: () => void }) {
   const [sheets, setSheets] = useState<Sheet[] | null>(null);

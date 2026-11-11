@@ -233,6 +233,7 @@ export default function MessageList({
                     onDrop={state.drop}
                     onRequestChanged={state.refreshRequest}
                     onDocumentChanged={state.refreshDocument}
+                    chatId={chat.id}
                   />
                 </Fragment>
               );
@@ -295,6 +296,7 @@ function Bubble({
   onDrop,
   onRequestChanged,
   onDocumentChanged,
+  chatId,
 }: {
   item: Item;
   mine: boolean;
@@ -312,6 +314,7 @@ function Bubble({
   onDrop: (messageId: string) => void;
   onRequestChanged: (requestId: string) => void;
   onDocumentChanged: (requestId: string) => void;
+  chatId: string;
 }) {
   const name = sender ? personName(sender) : "Former member";
   const o = item.outgoing;
@@ -329,7 +332,7 @@ function Bubble({
         {showName && !mine && <p className="mb-1 px-1 text-[13px] font-bold">{name}</p>}
 
         {(item.saved.length > 0 || item.local.length > 0) && (
-          <Files saved={item.saved} local={item.local} links={links} mine={mine} onImage={onImage} />
+          <Files saved={item.saved} local={item.local} links={links} mine={mine} onImage={onImage} chatId={chatId} />
         )}
 
         {item.request && (
@@ -395,27 +398,37 @@ function Files({
   links,
   mine,
   onImage,
+  chatId,
 }: {
   saved: Attachment[];
   local: DraftFile[];
   links: Map<string, string>;
   mine: boolean;
   onImage: () => void;
+  chatId: string;
 }) {
+  // Sent files open in CommonTab's viewer (spreadsheets as tables, PDFs page by page, photos
+  // with zoom), with Download there. Files still uploading just show their preview.
   const files = [
-    ...saved.map((a) => ({ key: a.id, name: a.name, type: a.mime_type, size: a.size_bytes, url: links.get(a.path) ?? null })),
-    ...local.map((f) => ({ key: f.key, name: f.file.name, type: f.file.type, size: f.file.size, url: f.preview })),
+    ...saved.map((a) => ({
+      key: a.id,
+      name: a.name,
+      type: a.mime_type,
+      size: a.size_bytes,
+      url: links.get(a.path) ?? null,
+      view: `/group/${chatId}/files/${a.id}` as string | null,
+    })),
+    ...local.map((f) => ({ key: f.key, name: f.file.name, type: f.file.type, size: f.file.size, url: f.preview, view: null as string | null })),
   ];
   return (
     <div className={`mb-1 flex flex-wrap gap-1.5 ${mine ? "justify-end" : ""}`}>
       {files.map((f) =>
         f.type.startsWith("image/") ? (
-          <a
+          <OpenFile
             key={f.key}
-            href={f.url ?? undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`Open ${f.name}`}
+            view={f.view}
+            url={f.url}
+            label={`Open ${f.name}`}
             className="block overflow-hidden rounded-2xl border border-line bg-mist"
           >
             {f.url ? (
@@ -424,13 +437,13 @@ function Files({
             ) : (
               <span className="flex h-40 w-40 items-center justify-center text-xs text-muted">Loading…</span>
             )}
-          </a>
+          </OpenFile>
         ) : (
-          <a
+          <OpenFile
             key={f.key}
-            href={f.url ?? undefined}
-            target="_blank"
-            rel="noopener noreferrer"
+            view={f.view}
+            url={f.url}
+            label={`Open ${f.name}`}
             className="flex w-60 items-center gap-3 rounded-2xl border border-line bg-white p-3 hover:bg-mist"
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-tint text-brand">
@@ -442,10 +455,26 @@ function Files({
                 {fileKindLabel({ mime_type: f.type, name: f.name })} · {fileSize(f.size)}
               </span>
             </span>
-          </a>
+          </OpenFile>
         ),
       )}
     </div>
+  );
+}
+
+/** A sent file opens in CommonTab's viewer; one still uploading opens its local preview. */
+function OpenFile({ view, url, label, className, children }: { view: string | null; url: string | null; label: string; className: string; children: React.ReactNode }) {
+  if (view) {
+    return (
+      <Link href={view} aria-label={label} className={className}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <a href={url ?? undefined} target="_blank" rel="noopener noreferrer" aria-label={label} className={className}>
+      {children}
+    </a>
   );
 }
 

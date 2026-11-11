@@ -379,6 +379,13 @@ export async function sheetXlsx(data: SheetData): Promise<Blob> {
   const head = (labels: string[]) => labels.map((value) => ({ value, fontWeight: "bold" as const, backgroundColor: "#E8F2E4" }));
   type Cell = Record<string, unknown> | null;
   const n = c.items.length;
+  // Each formula also carries its value (worked out here in plain code), so the file shows the
+  // right numbers anywhere: CommonTab's viewer, phone previews, Excel or Google Sheets.
+  const cached = new Map<string, number>();
+  const formula = (text: string, cents: number, extra: Record<string, unknown> = {}) => {
+    cached.set(text, money(cents));
+    return { value: text, type: "Formula", format: MONEY, ...extra };
+  };
   const costRows: Cell[][] = [
     head(["Date", "Title", "Vendor", "Category", "Amount", "Paid by", "Source", "Check"]),
     ...c.items.map((i) => [
@@ -391,7 +398,7 @@ export async function sheetXlsx(data: SheetData): Promise<Blob> {
       { value: SOURCE_LABEL[i.source_type], type: String },
       i.needs_check ? { value: "Check this", type: String } : null,
     ]),
-    [null, { value: "Total", type: String, fontWeight: "bold" }, null, null, { value: `SUM(E2:E${n + 1})`, type: "Formula", format: MONEY, fontWeight: "bold" }, null, null, null],
+    [null, { value: "Total", type: String, fontWeight: "bold" }, null, null, formula(`SUM(E2:E${n + 1})`, c.total, { fontWeight: "bold" }), null, null, null],
   ];
   const sheets: { data: Cell[][]; sheet: string; columns?: { width: number }[]; stickyRowsCount?: number }[] = [];
   if (tabs.includes("summary")) {
@@ -400,14 +407,14 @@ export async function sheetXlsx(data: SheetData): Promise<Blob> {
       columns: [{ width: 28 }, { width: 16 }],
       data: [
         head([data.plan?.title || "Spreadsheet", ""]),
-        [{ value: "Total costs", type: String }, { value: `'All costs'!E${n + 2}`, type: "Formula", format: MONEY }],
+        [{ value: "Total costs", type: String }, formula(`'All costs'!E${n + 2}`, c.total)],
         [{ value: "Collected", type: String }, { value: money(c.collected), type: Number, format: MONEY }],
         [{ value: "Still owed", type: String }, { value: money(c.outstanding), type: Number, format: MONEY }],
         [null, null],
         head(["Category", "Amount"]),
-        ...c.categories.map(([name]) => [
+        ...c.categories.map(([name, cents]) => [
           { value: name, type: String },
-          { value: `SUMIF('All costs'!D2:D${n + 1},"${name.replace(/"/g, '""')}",'All costs'!E2:E${n + 1})`, type: "Formula", format: MONEY },
+          formula(`SUMIF('All costs'!D2:D${n + 1},"${name.replace(/"/g, '""')}",'All costs'!E2:E${n + 1})`, cents),
         ]),
       ],
     });
@@ -424,7 +431,7 @@ export async function sheetXlsx(data: SheetData): Promise<Blob> {
           { value: p.name, type: String },
           { value: money(p.owed), type: Number, format: MONEY },
           { value: money(p.paid), type: Number, format: MONEY },
-          { value: `B${idx + 2}-C${idx + 2}`, type: "Formula", format: MONEY },
+          formula(`B${idx + 2}-C${idx + 2}`, p.owed - p.paid),
           { value: money(p.outOfPocket), type: Number, format: MONEY },
         ]),
       ],
@@ -447,7 +454,31 @@ export async function sheetXlsx(data: SheetData): Promise<Blob> {
     });
   }
   // The library's types are strict about cell shapes; these are all valid cells.
-  return (writeExcelFile as unknown as (s: unknown) => { toBlob: () => Promise<Blob> })(sheets).toBlob();
+  const blob = await (writeExcelFile as unknown as (s: unknown) => { toBlob: () => Promise<Blob> })(sheets).toBlob();
+  return withFormulaValues(blob, cached);
+}
+
+const unescapeXml = (s: string) => s.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+
+/** Writes each formula's value into the .xlsx next to the formula, and asks Excel to
+ *  recalculate when it opens (so edits there still update the totals). */
+async function withFormulaValues(blob: Blob, cached: Map<string, number>): Promise<Blob> {
+  const { unzipSync, zipSync, strFromU8, strToU8 } = await import("fflate");
+  const files = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+  for (const name of Object.keys(files)) {
+    if (/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) {
+      const xml = strFromU8(files[name]).replace(/<f>([^<]*)<\/f>(?:<v>[^<]*<\/v>)?/g, (whole, text: string) => {
+        const value = cached.get(unescapeXml(text));
+        return value === undefined ? whole : `<f>${text}</f><v>${value}</v>`;
+      });
+      files[name] = strToU8(xml);
+    }
+    if (name === "xl/workbook.xml") {
+      const xml = strFromU8(files[name]);
+      if (!xml.includes("<calcPr")) files[name] = strToU8(xml.replace("</workbook>", '<calcPr fullCalcOnLoad="1"/></workbook>'));
+    }
+  }
+  return new Blob([zipSync(files) as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }
 
 /** The All costs tab as CSV. */
