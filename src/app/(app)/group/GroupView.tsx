@@ -265,6 +265,21 @@ export default function GroupView() {
     return null;
   }
 
+  // Anyone. If the owner leaves, the database hands ownership to the first organizer added
+  // (or the first member added).
+  async function leaveGroup(): Promise<string | null> {
+    if (!active || active.kind !== "group") return null;
+    const { id, name } = active;
+    const { data: successor, error } = await supabase.rpc("leave_group", { target: id });
+    if (error) return error.message;
+    const heir = successor ? active.members.find((m) => m.user_id === successor) : null;
+    setDialog(null);
+    setActiveId(null);
+    await load();
+    setToast(`You left “${name}”.${heir ? ` ${personName(heir)} is now the owner.` : ""}`);
+    return null;
+  }
+
   // Owner and organizers. A new picture is uploaded first; then name, description and picture
   // save in one update, which reaches the other members live. Old picture files are cleaned up after.
   async function saveGroup(edit: GroupEdit): Promise<string | null> {
@@ -419,6 +434,7 @@ export default function GroupView() {
         onRemove={removeMember}
         onTransfer={transferOwnership}
         onDelete={deleteGroup}
+        onLeave={leaveGroup}
         onEdit={() => setDialog("edit")}
       />
       <EditGroupDialog

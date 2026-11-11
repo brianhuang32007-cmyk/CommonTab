@@ -5,7 +5,7 @@ import { BoltIcon, CheckIcon, ClockIcon, FileIcon, LinkIcon } from "@/components
 // request card and a "based on" source line. The AI picks pieces; plain code fills in the
 // numbers (amounts are whole cents, formatted here, never worked out by the AI).
 
-export type PaymentStatus = "pending" | "confirmed" | "marked_paid" | "settled" | "disputed" | "overdue";
+export type PaymentStatus = "pending" | "confirmed" | "marked_paid" | "settled" | "disputed" | "waived" | "overdue" | "open";
 
 export type Block =
   | { type: "text"; text: string }
@@ -50,8 +50,10 @@ export type ChatEntry =
 const STATUS: Record<PaymentStatus, { label: string; className: string }> = {
   pending: { label: "Pending", className: "bg-mist text-muted" },
   confirmed: { label: "Confirmed", className: "bg-tint text-brand" },
-  marked_paid: { label: "Marked paid", className: "bg-tint text-brand" },
-  settled: { label: "Settled", className: "bg-tint text-brand" },
+  marked_paid: { label: "Awaiting approval", className: "bg-butter-strong text-[#5C4A0B]" },
+  settled: { label: "Paid", className: "bg-tint text-brand" },
+  waived: { label: "Waived", className: "bg-mist text-muted" },
+  open: { label: "Open", className: "bg-tint text-brand" },
   // No red for money states: yellow with dark text.
   disputed: { label: "Disputed", className: "bg-butter text-honey" },
   overdue: { label: "Overdue", className: "bg-butter text-honey" },

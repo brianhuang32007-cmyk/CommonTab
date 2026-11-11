@@ -2,7 +2,13 @@
 
 import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { shrinkPhoto, toBase64 } from "@/lib/photos";
-import type { ChatEntry } from "./blocks";
+import type { Block, ChatEntry } from "./blocks";
+
+/** Separates the answer's text from its cards (see /api/ai/chat). */
+const CARDS_MARK = "\u001e";
+/** Internal ids are for the AI's tools, never for reading: drop any that slip into an answer. */
+const tidy = (text: string) =>
+  text.replace(/["'`(]?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}["'`)]?/gi, "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
 
 // One conversation with CommonTab AI: sending questions to /api/ai/chat (server only),
 // streaming the answer in word by word, and keeping the recent turns for follow-ups.
@@ -109,7 +115,7 @@ function useConversation() {
           return;
         }
 
-        // Words arrive as they're written.
+        // Words arrive as they're written; payment and document cards come last, after CARDS_MARK.
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let said = "";
@@ -117,14 +123,19 @@ function useConversation() {
           const { value, done } = await reader.read();
           if (done) break;
           said += decoder.decode(value, { stream: true });
-          update(replyId, { blocks: [{ type: "text", text: said }], state: "streaming" });
+          update(replyId, { blocks: [{ type: "text", text: tidy(said.split(CARDS_MARK)[0]) }], state: "streaming" });
         }
         said += decoder.decode();
-        const final = said.trim();
+        const [words, cardJson] = said.split(CARDS_MARK);
+        let cards: Block[] = [];
+        try {
+          cards = cardJson ? (JSON.parse(cardJson) as Block[]).filter((b) => b.type === "payment" || b.type === "document") : [];
+        } catch {}
+        const final = tidy(words).trim();
         update(
           replyId,
-          final
-            ? { blocks: [{ type: "text", text: final }], state: "done" }
+          final || cards.length
+            ? { blocks: [...(final ? [{ type: "text" as const, text: final }] : []), ...cards], state: "done" }
             : { blocks: [{ type: "text", text: UNAVAILABLE }], state: "error" },
         );
       } catch {

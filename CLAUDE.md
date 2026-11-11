@@ -150,6 +150,7 @@ Tab names follow the approved dashboard design (they used to be Chats, Agent and
   - Owner: invite or remove anyone, make people members or organizers, edit or delete the group, and hand ownership to another member (becoming an organizer).
   - Organizer: invite contacts as members, edit the group, and remove only the people they added.
   - Member: can't invite or remove anyone.
+- **Anyone can leave a group** with **Leave Group** in Details (confirm first; Brian's call, 2026-11-10; migration `20261110300000_leave_group.sql`). When the **owner** leaves, ownership goes to the **organizer added first**, or if there are none, the **member added first**; the confirmation names who. The last person in a group can't leave it; they delete the group instead.
 - All of this lives in the group's **Details** window.
 - Real-time messaging in groups, plus one-on-one direct messages, with photo and PDF attachments.
 - **@mentions** in chat, stored by user id. Tagging is how payment and document requests will get assigned.
@@ -316,7 +317,7 @@ Last update: 2026-11-10. **The app prototype is finished and the MVP is complete
 
 **MVP status:**
 - **Built and live:** accounts, profile and preferences (with payment handles); contacts; groups, chats and DMs with @mentions and attachments; payment requests (equal and custom splits, AI receipt scan); confirm, dispute and dispute chats; **real payments** (Venmo / PayPal / Zelle outside CommonTab, screenshot proof, AI check, requester approves); document requests with AI Verify, a private file viewer and each chat's Files tab; Alerts & Reminders with the bell, payment search and read marks; the Dashboard with real totals; Document Drafting (Fill Out a Form, Build a Spreadsheet, viewed inside CommonTab); and the CommonTab AI chatbot.
-- **Not built (after the MVP):** Agent reminders as a scheduled job (Step 17), the AI bot's tools for requests (what you owe, who still owes; Step 16's second part), email and push notifications, and real in-app payments.
+- **Not built (after the MVP):** Agent reminders as a scheduled job (Step 17), email and push notifications, and real in-app payments. (The AI bot's tools for payments, documents and the account were added 2026-11-10.)
 - **Still to test with a second account** (e.g. @briantest) before a real group uses it: contacts end to end; paying with each method, sending proof, approving, rejecting and resubmitting; document uploads, AI Verify, accept and reject, Can't Provide, and the viewer with each file type; Document Drafting with a Word form, a photo of a form and Answer a Request; and the bell filling up when someone else acts on your requests. Step 18 (a test run with a real group) is next.
 
 **Done: Steps 6 and 7, Groups and chats** (migrations `20261110030000` to `20261110090000` have all been run). Code is in `src/app/(app)/group/`. Groups with owner, organizer and member roles; a Details window (members, roles, Invite Contacts with search, Edit Group, Delete Group, Make Owner); DMs; chat with date lines, older messages on scroll, live updates, attachments (JPG, PNG, WebP or PDF, up to 5 at 10 MB each, private to members) and @mentions; an "@ You" badge on chats with unread mentions; new messages in the alert bell; and the unread count on the Group tab. Group pictures and chat files are private and open through short-lived links (`src/lib/signedLinks.ts`). Every write goes through checked database functions, and app-made ids stop duplicates on retry.
@@ -330,7 +331,8 @@ Known gaps from Steps 6 and 7:
 - The `/ai` page and a small chat window on the Dashboard ("Ask CommonTab AI") share one conversation (`AiChatProvider` in the app frame). The page shows the full history; the window shows only what's asked during the current Dashboard visit. Not saved to the database yet (clears on reload).
 - The AI can look up the user's own groups, chats, messages and contacts, read one attached photo (shrunk in the browser) or PDF (3 MB max), and split an amount with `split_evenly` (plain code, extra cents to the first people). It can't post, change, approve or pay anything.
 - Limits: 30 questions per person in any 24 hours, every call logged in `ai_calls` (including which model answered).
-- When requests exist, give the AI read-only tools for them (what you owe, who still owes, due dates) and use the answer cards in `src/app/(app)/ai/blocks.tsx` (payment summary, document request).
+- **Account tools** (added 2026-11-10, Brian's call; `src/app/api/ai/chat/accountTools.ts`): the AI can read, with the person's own session, **their payments** (`my_payments`: what they owe and are owed, already added up in plain code; every request, open or fully paid, with each person's status), **one payment's details** (people, receipt, history, payment proofs), **document requests** and **one request's details** (who was asked, what was sent, AI Verify summaries), **accepted documents** in their chats, **what needs them** (the same tasks as Alerts), **their account** (name, username, email, phone, payment handles, reminder and privacy settings) and **their drafts**.
+- **Answer cards:** the AI calls `show_cards` with request ids, and the server fills **payment cards** (amount, status, due date, who's paid, View request) and **document cards** from the database, so it can't invent a number. If the AI names requests without asking for cards, the server adds the cards for the ones it named. Cards travel after the answer's text (after a `\u001e` mark) and show under the answer on the AI page. Internal ids never show in answers.
 
 **Dashboard** (Step 14, built 2026-11-10): all live; see section 8.
 
@@ -354,7 +356,7 @@ Tested with @briantest: a full negotiation (propose, decline, counter, accept), 
 
 **Done: Step 15, Document Drafting** (2026-11-10; migration `20261110260000_document_drafting.sql` has been run). Spreadsheets sent to chats or requests open inside CommonTab's viewer, with Download. See section 7. Still to test with real forms and chats: a fillable PDF, a Word form, a photo of a form, and a spreadsheet from a chat with payment requests and receipts.
 
-**After the MVP** (Brian's call on what comes first): Step 18's test run with a real group; the rest of 16 (AI tools for requests: what you owe, who still owes; answer cards in `src/app/(app)/ai/blocks.tsx`); 17 (scheduled reminders); email and push notifications. Keep building one piece at a time and plan each piece with Brian before writing code.
+**After the MVP** (Brian's call on what comes first): Step 18's test run with a real group; 17 (scheduled reminders); email and push notifications. Keep building one piece at a time and plan each piece with Brian before writing code.
 
 Rules that still apply: amounts in whole cents and all math in plain code; money states never use red ("you owe" is ink, overdue and disputed are honey on butter); every write goes through checked database functions with app-made ids so retries can't duplicate; CommonTab never holds money.
 

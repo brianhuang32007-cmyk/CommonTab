@@ -768,6 +768,8 @@ type DetailsProps = {
   onRemove: Action;
   onTransfer: Action;
   onDelete: () => Promise<string | null>;
+  /** Anyone: leave the group (the owner hands ownership on). */
+  onLeave: () => Promise<string | null>;
   /** Owner and organizers: open Edit Group. */
   onEdit: () => void;
 };
@@ -790,6 +792,7 @@ function DetailsWindow({
   onRemove,
   onTransfer,
   onDelete,
+  onLeave,
   onEdit,
 }: DetailsProps & { group: Conversation }) {
   const [picked, setPicked] = useState<Picked>({});
@@ -800,6 +803,7 @@ function DetailsWindow({
   const [confirm, setConfirm] = useState<{ kind: "remove" | "owner"; userId: string } | null>(null);
   const [search, setSearch] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
 
   const myRole = group.members.find((m) => m.user_id === me)?.role ?? "member";
   const isOwner = myRole === "owner";
@@ -1094,6 +1098,7 @@ function DetailsWindow({
                   type="button"
                   onClick={() => {
                     resetPanels();
+                    setConfirmLeave(false);
                     setConfirmDelete(true);
                   }}
                   className="mt-4 h-11 w-full rounded-xl border border-line bg-white text-sm font-bold text-ink hover:bg-butter"
@@ -1101,6 +1106,61 @@ function DetailsWindow({
                   Delete Group
                 </button>
               ))}
+
+            {/* Anyone can leave. The owner's role goes to the first organizer added, or else the first member added. */}
+            {(() => {
+              const others = group.members.filter((m) => m.user_id !== me); // in the order they joined
+              const successor = isOwner ? (others.find((m) => m.role === "organizer") ?? others[0] ?? null) : null;
+              if (!confirmLeave) {
+                return (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetPanels();
+                      setConfirmDelete(false);
+                      setConfirmLeave(true);
+                    }}
+                    className={`${isOwner ? "mt-2" : "mt-4"} h-11 w-full rounded-xl border border-line bg-white text-sm font-bold text-ink hover:bg-butter`}
+                  >
+                    Leave Group
+                  </button>
+                );
+              }
+              return (
+                <div className="mt-4 rounded-2xl bg-butter p-4">
+                  <p className="text-sm font-extrabold text-honey">Leave “{group.name}”?</p>
+                  <p className="mt-1 text-sm text-ink">
+                    {others.length === 0
+                      ? "You're the only one here, so you can't leave. Delete the group instead."
+                      : successor
+                        ? `You'll leave the chat and the group. ${personName(successor)} becomes the owner${successor.role === "organizer" ? " (the first organizer added)" : " (the first member added)"}.`
+                        : "You'll leave the chat and the group. To come back, someone in the group has to invite you again."}
+                  </p>
+                  <div className="mt-3 flex gap-2">
+                    {others.length > 0 && (
+                      <button
+                        type="button"
+                        autoFocus
+                        disabled={busy !== null}
+                        onClick={() => run("leave", onLeave)}
+                        className="flex h-11 items-center gap-2 rounded-[10px] bg-ink px-4 text-sm font-bold text-white hover:bg-black disabled:opacity-60"
+                      >
+                        {busy === "leave" && <Spinner />}
+                        {busy === "leave" ? "Leaving…" : "Yes, Leave Group"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => setConfirmLeave(false)}
+                      className="h-11 rounded-[10px] border border-line bg-white px-4 text-sm font-bold hover:bg-white/60 disabled:opacity-60"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </>
       ) : (
