@@ -66,6 +66,11 @@ export default function SettleView() {
         clearTimeout(timer);
         timer = setTimeout(load, 150);
       })
+      // The request (or its chat) is deleted while this is open: reload, which shows it's gone.
+      .on("postgres_changes", { event: "*", schema: "public", table: "payment_requests" }, () => {
+        clearTimeout(timer);
+        timer = setTimeout(load, 150);
+      })
       .subscribe();
     return () => {
       clearTimeout(timer);

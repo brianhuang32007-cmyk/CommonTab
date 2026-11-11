@@ -55,6 +55,19 @@ export default function FileViewer() {
     };
   }, [supabase, fileId]);
 
+  // The chat is deleted while this is open: close the file right away (storage already refuses it).
+  useEffect(() => {
+    const channel = supabase
+      .channel(`doc-file-chat-${chatId}`)
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "conversations" }, (payload) => {
+        if ((payload.old as { id?: string }).id === chatId) setState({ status: "missing" });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, chatId]);
+
   const back = documentHref(chatId, requestId);
 
   if (state.status === "loading") {
