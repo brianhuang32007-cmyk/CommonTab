@@ -14,7 +14,7 @@
 
 Groups that share costs usually track them across chats, spreadsheets and Venmo history, and nobody is sure who still owes what. **CommonTab** gives every shared cost one record: what it's for, the amount and split, the receipt, the deadline, each person's status and proof of payment. Money moves through the apps people already use (Venmo, PayPal, Zelle); CommonTab coordinates everything around it.
 
-Designed, built and deployed end to end as a solo project: product, database, backend, frontend and AI features.
+Designed, built and deployed end to end: product, database, backend, frontend and AI features.
 
 ## How the app works
 
@@ -47,6 +47,6 @@ Next.js · React · TypeScript · Tailwind CSS · Supabase (Postgres, Auth, Stor
 
 ## Status
 
-MVP complete and deployed (November 2026). Started from a project idea for the RAMP hackathon (October 2026).
+MVP complete and deployed (November 2026).
 
-**Built by Brian Huang.**
+**Built by Brian Huang and Wei Wei Wang.**
