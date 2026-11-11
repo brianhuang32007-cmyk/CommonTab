@@ -90,13 +90,13 @@ export async function saveReminders(input: {
 }
 
 export async function savePrivacy(input: {
-  discoverableBy: "everyone" | "contacts";
+  discoverableBy: "everyone" | "groups";
   showPhone: boolean;
 }): Promise<SaveResult> {
   const { supabase, userId } = await signedIn();
   if (!userId) return { error: SESSION_ENDED };
 
-  const discoverableBy = input.discoverableBy === "contacts" ? "contacts" : "everyone";
+  const discoverableBy = input.discoverableBy === "groups" ? "groups" : "everyone";
   const { error } = await supabase
     .from("profiles")
     .update({ discoverable_by: discoverableBy, show_phone: Boolean(input.showPhone) })

@@ -90,7 +90,7 @@ export default async function PreferencesPage() {
       <Card id="privacy" title="Privacy" description="Control who can find you and what they see.">
         <PrivacyForm
           initial={{
-            discoverableBy: p.discoverable_by === "contacts" ? "contacts" : "everyone",
+            discoverableBy: p.discoverable_by === "groups" || p.discoverable_by === "contacts" ? "groups" : "everyone",
             showPhone: p.show_phone,
           }}
           hasPhone={Boolean(p.phone)}

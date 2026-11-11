@@ -5,11 +5,11 @@ import { savePrivacy } from "./actions";
 import SaveStatus, { type Status } from "./SaveStatus";
 import Toggle from "./Toggle";
 
-type Privacy = { discoverableBy: "everyone" | "contacts"; showPhone: boolean };
+type Privacy = { discoverableBy: "everyone" | "groups"; showPhone: boolean };
 
 const WHO: { value: Privacy["discoverableBy"]; label: string; hint: string }[] = [
   { value: "everyone", label: "Everyone", hint: "Anyone on CommonTab can find you and send a request." },
-  { value: "contacts", label: "Only my contacts", hint: "Only people you've already added can find you." },
+  { value: "groups", label: "Only people in shared groups", hint: "Only people who are in a group with you can find you." },
 ];
 
 // Each choice saves as soon as it's made.

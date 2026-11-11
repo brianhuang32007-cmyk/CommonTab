@@ -133,6 +133,26 @@ export default function GroupView() {
     if (linked && linked === handledLink) router.replace("/group", { scroll: false });
   }, [linked, handledLink, router]);
 
+  // /group?dm=<person's id> (the Message icon on Contacts): opens your DM with them, or starts one.
+  const dmWith = params.get("dm");
+  const handledDm = useRef<string | null>(null);
+  useEffect(() => {
+    if (!dmWith || handledDm.current === dmWith || list.status !== "ready") return;
+    handledDm.current = dmWith;
+    const existing = list.chats.find((c) => c.kind === "dm" && c.members.some((m) => m.user_id === dmWith));
+    // Handled once (the chat list refreshes often), so the timer isn't cleared on re-runs.
+    setTimeout(async () => {
+      if (existing) open(existing.id, "dm");
+      else {
+        const problem = await startDm(dmWith);
+        if (problem) setToast(problem);
+      }
+      router.replace("/group", { scroll: false });
+    }, 0);
+    // open and startDm are plain functions recreated each render; the link is handled once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dmWith, list, router]);
+
   const chats = list.status === "ready" ? list.chats : [];
   const active =
     chats.find((c) => c.id === activeId) ?? chats.find((c) => c.kind === (filter === "groups" ? "group" : "dm")) ?? chats[0] ?? null;

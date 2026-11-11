@@ -136,7 +136,7 @@ Tab names follow the approved dashboard design (they used to be Chats, Agent and
 - **Preferences** page (each card saves on its own):
   - Payment handles, plus **Show first**: which handle friends see first
   - Reminders: separate switches for 3 days before, 1 day before and when overdue (all off = no reminders)
-  - Privacy: who can find me by username (**Everyone** or **Only my contacts**), and show my phone to contacts. Stored now; enforced when Contacts is built (Step 5).
+  - Privacy: who can find me by username (**Everyone** or **Only people in shared groups**, Brian's call 2026-11-10; migration `20261110290000_privacy_shared_groups.sql`), and show my phone to contacts. Enforced in username search and contact requests; people you're already connected to can still find you.
   - Account: change email (confirmation link), change password (email accounts; asks for the current one), log out, **delete account** (immediate and permanent; type your username to confirm; removes photos, then the login, and the profile goes with it)
 
 ## 2. Contacts
@@ -294,30 +294,35 @@ Each step is something we build together, review, then commit.
 | 0. Setup | 1 | Next.js + Supabase + Vercel project, `.gitignore`, environment variables, deployed placeholder page **(done)** |
 | 1. Foundation | 2 | Landing page, sign-up (Google, email + password), create profile, log in, forgot/reset password **(done)** |
 | | 3 | Preferences and Profile: edit profile, photo and payment handles, reminders, privacy, account **(done)** |
-| | 4 | Navigation bar with the tabs (placeholder pages) |
+| | 4 | Navigation bar with the tabs **(done: the app frame)** |
 | 2. Social | 5 | Contacts: add friends by username, friends list **(built; live test pending)** |
 | | 6 | Groups: create a group, invite friends, roles **(done)** |
 | | 7 | Real-time chat and direct messages **(done)** |
 | | 8 | @tagging in chat **(done: @mentions, and payment requests tag everyone paying; document requests come with Step 12)** |
 | 3. Money | 9 | Payment requests with equal and custom splits **(done)** |
 | | 10 | Confirm, dispute and dispute threads **(done)** |
-| | 11 | Settlement **(real payments: pay outside, send proof, requester approves)** |
-| 4. Documents | 12 | Document requests and uploads **(built; live test pending)** |
-| | 13 | AI receipt tools inside requests: scan and split, AI check on uploads |
-| 5. Dashboard | 14 | Dashboard: owe/owed, documents to review, settled progress, attention and activity **(built)** |
-| 6. AI | 15 | Document Drafting: Fill Out a Form and Build a Spreadsheet **(built; live test pending)** |
+| | 11 | Settlement **(done: real payments: pay outside, send proof, AI check, requester approves)** |
+| 4. Documents | 12 | Document requests and uploads **(done)** |
+| | 13 | AI receipt tools inside requests: scan and split, AI check on uploads **(done: receipt scan, AI Verify, payment screenshot check)** |
+| 5. Dashboard | 14 | Dashboard: owe/owed, documents to review, settled progress, attention and activity **(done)** |
+| 6. AI | 15 | Document Drafting: Fill Out a Form and Build a Spreadsheet **(done)** |
 | | 16 | CommonTab Agent: questions and answers **(done early: groups, chats, contacts, reading receipts; payment and document answers come as those steps land)** |
-| | 17 | Agent reminders (scheduled job) |
-| 7. Ship | 18 | Polish, mobile check, deploy, test run with a real group |
+| | 17 | Agent reminders (scheduled job) **(after the MVP)** |
+| 7. Ship | 18 | Polish, mobile check, deploy, test run with a real group **(prototype finished and deployed; real-group test next)** |
 
 ## Current step
 
-Last update: 2026-11-10. Steps 1 to 3, 5 to 7, 9 to 11, Alerts & Reminders and the first part of Step 16 are done and live (Step 4 is covered by the app frame in `src/app/(app)/layout.tsx`). Contacts still needs a live test with two accounts.
+Last update: 2026-11-10. **The app prototype is finished and the MVP is complete (Brian's call, 2026-11-10).** Everything below is built and live at https://common-tab.vercel.app, and every migration up to `20261110280000_payment_ai_check.sql` has been run.
+
+**MVP status:**
+- **Built and live:** accounts, profile and preferences (with payment handles); contacts; groups, chats and DMs with @mentions and attachments; payment requests (equal and custom splits, AI receipt scan); confirm, dispute and dispute chats; **real payments** (Venmo / PayPal / Zelle outside CommonTab, screenshot proof, AI check, requester approves); document requests with AI Verify, a private file viewer and each chat's Files tab; Alerts & Reminders with the bell, payment search and read marks; the Dashboard with real totals; Document Drafting (Fill Out a Form, Build a Spreadsheet, viewed inside CommonTab); and the CommonTab AI chatbot.
+- **Not built (after the MVP):** Agent reminders as a scheduled job (Step 17), the AI bot's tools for requests (what you owe, who still owes; Step 16's second part), email and push notifications, and real in-app payments.
+- **Still to test with a second account** (e.g. @briantest) before a real group uses it: contacts end to end; paying with each method, sending proof, approving, rejecting and resubmitting; document uploads, AI Verify, accept and reject, Can't Provide, and the viewer with each file type; Document Drafting with a Word form, a photo of a form and Answer a Request; and the bell filling up when someone else acts on your requests. Step 18 (a test run with a real group) is next.
 
 **Done: Steps 6 and 7, Groups and chats** (migrations `20261110030000` to `20261110090000` have all been run). Code is in `src/app/(app)/group/`. Groups with owner, organizer and member roles; a Details window (members, roles, Invite Contacts with search, Edit Group, Delete Group, Make Owner); DMs; chat with date lines, older messages on scroll, live updates, attachments (JPG, PNG, WebP or PDF, up to 5 at 10 MB each, private to members) and @mentions; an "@ You" badge on chats with unread mentions; new messages in the alert bell; and the unread count on the Group tab. Group pictures and chat files are private and open through short-lived links (`src/lib/signedLinks.ts`). Every write goes through checked database functions, and app-made ids stop duplicates on retry.
 
 Known gaps from Steps 6 and 7:
-- Contacts' Message icon and the profile pop-up's Message button link to `/group?dm=<username>`, which doesn't open the DM yet (`/group?chat=<id>` does).
+- Fixed 2026-11-10: Contacts' Message icon and the profile pop-up's Message button open your DM with that person (`/group?dm=<their id>`), starting one if you don't have it yet.
 - Sending, attachments, the "@ You" badge and message alerts still need a live test with a second account (e.g. @briantest).
 - Drafts aren't kept when switching chats. Files left behind when the browser closes mid-upload aren't cleaned up yet (a scheduled cleanup could come with Step 17).
 
@@ -339,17 +344,17 @@ Tested with @briantest: a full negotiation (propose, decline, counter, accept), 
 
 **Done: Alerts & Reminders** (2026-11-10; migrations `20261110180000` to `20261110210000` have all been run; live). See "Alerts & Reminders" above. Payment search was checked on the live site (by title and by CT- ID). Still to test with real data: the bell filling with new unread payment alerts when someone else acts on your request, and the search ranking across groups (only checked in `/demo/alerts` so far).
 
-**Built: Step 12, Request Document, with AI Verify from Step 13** (2026-11-10; migration `20261110220000_document_requests.sql`). See section 6. Still to test with a second account (e.g. @briantest): uploading, AI Verify on real files, accept and reject, Can't Provide, and the viewer with each file type.
+**Done: Step 12, Request Document, with AI Verify from Step 13** (2026-11-10; migration `20261110220000_document_requests.sql`). See section 6. Still to test with a second account (e.g. @briantest): uploading, AI Verify on real files, accept and reject, Can't Provide, and the viewer with each file type.
 
 **Done since:** owner can cancel document requests (an × on the card and page), shared **AI Verified** results with `AI_VERIFY_SECRET`, and accepted documents kept in each chat's **Files** tab (migrations `20261110230000` to `20261110250000` have all been run; all live).
 
-**Now: the Dashboard** (Step 14, 2026-11-10): real You owe, You're owed, Documents to review, Settled across groups, Needs your attention and Recent activity (section 8).
+**Done: the Dashboard** (Step 14, 2026-11-10): real You owe, You're owed, Documents to review, Settled across groups, Needs your attention and Recent activity (section 8).
 
-**Built: the payment flow again** (2026-11-10): real payments with proof replaced the simulation (see section 5). Still to test with @briantest: paying with each method, sending proof, approving and rejecting, and resubmitting.
+**Done: the payment flow again** (2026-11-10; migrations `20261110270000` and `20261110280000` have been run): real payments with proof replaced the simulation (see section 5). Still to test with @briantest: paying with each method, sending proof, approving and rejecting, and resubmitting.
 
-**Built: Step 15, Document Drafting** (2026-11-10; migration `20261110260000_document_drafting.sql`). See section 7. Still to test with real forms and chats: a fillable PDF, a Word form, a photo of a form, and a spreadsheet from a chat with payment requests and receipts.
+**Done: Step 15, Document Drafting** (2026-11-10; migration `20261110260000_document_drafting.sql` has been run). Spreadsheets sent to chats or requests open inside CommonTab's viewer, with Download. See section 7. Still to test with real forms and chats: a fillable PDF, a Word form, a photo of a form, and a spreadsheet from a chat with payment requests and receipts.
 
-**After that:** 13 (the AI Verify part is built; scan and split stays with Request Payment), 14 (Dashboard money numbers), the rest of 16 (AI tools for requests: what you owe, who still owes; answer cards in `src/app/(app)/ai/blocks.tsx`), 17 (reminders). Build one piece at a time and plan each piece with Brian before writing code.
+**After the MVP** (Brian's call on what comes first): Step 18's test run with a real group; the rest of 16 (AI tools for requests: what you owe, who still owes; answer cards in `src/app/(app)/ai/blocks.tsx`); 17 (scheduled reminders); email and push notifications. Keep building one piece at a time and plan each piece with Brian before writing code.
 
 Rules that still apply: amounts in whole cents and all math in plain code; money states never use red ("you owe" is ink, overdue and disputed are honey on butter); every write goes through checked database functions with app-made ids so retries can't duplicate; CommonTab never holds money.
 

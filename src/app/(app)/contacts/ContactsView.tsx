@@ -106,7 +106,7 @@ export default function ContactsView({ initialRows, loadError }: { initialRows: 
               <div>
                 <p className="font-bold text-ink">Who can find you</p>
                 <p className="mt-0.5 text-[13px] text-[#3E4A43]">
-                  Choose whether anyone can search @{me.username}, or only your contacts. Your birthday is never shown.
+                  Choose whether anyone can search @{me.username}, or only people in your groups. Your birthday is never shown.
                 </p>
                 <Link href="/preferences#privacy" className="mt-2 inline-block text-sm font-bold text-brand hover:underline">
                   Change in Preferences
@@ -370,7 +370,7 @@ function ContactsCard({ rows, actions, onView }: { rows: ContactRow[]; actions: 
                       <UserIcon className="h-5 w-5" />
                     </IconButton>
                     <Link
-                      href={`/group?dm=${encodeURIComponent(r.username)}`}
+                      href={`/group?dm=${encodeURIComponent(r.user_id)}`}
                       aria-label={`Message ${name}`}
                       title={`Message ${name}`}
                       className="flex h-11 w-11 items-center justify-center rounded-xl text-brand transition hover:bg-tint"
@@ -588,7 +588,7 @@ function ProfileDialog({
 
           <div className="mt-5 flex flex-wrap gap-2">
             <Link
-              href={`/group?dm=${encodeURIComponent(person.username)}`}
+              href={`/group?dm=${encodeURIComponent(person.user_id)}`}
               className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-brand px-4 font-semibold text-white hover:bg-brand-hover"
             >
               <ChatIcon className="h-5 w-5" />
