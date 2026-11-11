@@ -5,7 +5,7 @@ export const MENU = [
   { href: "/dashboard", label: "Dashboard", icon: HomeIcon },
   { href: "/group", label: "Group", icon: ChatIcon },
   { href: "/contacts", label: "Contacts", icon: ContactsIcon },
-  { href: "/ai", label: "CommonTab AI", icon: BoltIcon, badge: "NEW" },
+  { href: "/ai", label: "CommonTab AI", icon: BoltIcon },
   { href: "/documents", label: "Document Drafting", icon: DocumentIcon },
   { href: "/notifications", label: "Alerts & Reminders", icon: BellIcon },
 ] as const;

@@ -66,11 +66,6 @@ export default function SideNav({ onNavigate }: { onNavigate?: () => void }) {
                   {requestCount}
                 </span>
               )}
-              {"badge" in item && (
-                <span className="rounded-md bg-butter-strong px-2 py-0.5 text-[11px] font-bold tracking-wide text-[#5C4A0B]">
-                  {item.badge}
-                </span>
-              )}
             </Link>
           );
         })}
