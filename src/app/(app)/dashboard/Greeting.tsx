@@ -9,7 +9,8 @@ export default function Greeting() {
   const now = useNow();
   const { firstName } = useProfile();
   const groups = useDashboardGroups();
-  const { messages, unreadMessages } = useNotifications();
+  const { messages, unreadMessages, alerts } = useNotifications();
+  const tasks = alerts.filter((a) => a.type === "task").length;
 
   const count = groups.status === "ready" ? groups.groups.length : null;
   const line =
@@ -17,7 +18,9 @@ export default function Greeting() {
       ? " " // keeps the card's height while loading
       : count === 0
         ? "You're all caught up. Create a group to start your first shared tab."
-        : unreadMessages > 0
+        : tasks > 0
+          ? `${tasks} ${tasks === 1 ? "thing needs" : "things need"} your attention${unreadMessages > 0 ? `, and ${unreadMessages} unread ${unreadMessages === 1 ? "message" : "messages"}` : ""}.`
+          : unreadMessages > 0
           ? `You have ${unreadMessages} unread ${unreadMessages === 1 ? "message" : "messages"} in ${messages.length} ${messages.length === 1 ? "chat" : "chats"}.`
           : `You're in ${count} ${count === 1 ? "group" : "groups"} and all caught up.`;
 

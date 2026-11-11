@@ -249,10 +249,17 @@ Built 2026-11-10 (Brian's design; migration `20261110260000_document_drafting.sq
 **Code:** `src/app/(app)/documents/` (`DraftingHome.tsx`, `drafting.ts` for types, math, exports and sending, `SendPanel.tsx`, `form/[draftId]/FormDraft.tsx`, `sheet/[draftId]/SheetDraft.tsx`).
 
 ## 8. Dashboard
-- **For you:** what you owe, what you're owed, what's overdue, and documents you need to upload.
-- **For each group:** each request with a progress bar ("5/6 settled").
-- A summary of recent chats and groups.
-- A shortcut to the Agent.
+Built 2026-11-10 (Step 14, Brian's call). Everything is live and comes from the same alerts source as the bell and Alerts & Reminders (`NotificationsContext`), so the three always agree. Plain code adds everything up (whole cents).
+- **Greeting:** how many things need your attention (and unread messages), or that you're all caught up.
+- **Summary cards** (`src/app/(app)/dashboard/SummaryCards.tsx`):
+  - **You owe:** your unpaid shares (Pending, Confirmed, Awaiting approval or Disputed), with how many requests, overdue and awaiting approval. "You don't owe anything" when zero.
+  - **You're owed:** everyone else's unpaid shares on your requests (waived ones don't count), from how many people and how many payments to approve. "Nobody owes you anything" when zero.
+  - **Documents to review** (replaced Overdue): uploads waiting for your review on your document requests; **"You're all set"** when none.
+  - **Settled across groups:** Paid shares out of all shares in your groups' payment requests (open and fully paid, from `my_payment_search`; waived left out), as a percent with a bar. "No payments in your groups yet" when none.
+- **Your groups:** your real groups (unread counts, "@ You").
+- **Needs your attention:** every open task, most urgent first (confirm or pay a share, approve a payment, upload or review a document, an open dispute) with its deadline label, plus messages that mention you; **"You're all set"** when none; "See all" goes to Alerts & Reminders.
+- **Recent activity:** what happened on your payment and document requests (sent proof, approved, confirmed, disputed, documents received or accepted…) and new messages, newest first (8 at most); "See all" goes to Alerts & Reminders.
+- A shortcut to CommonTab AI ("Ask CommonTab AI").
 
 ## 9. CommonTab Agent (AI chatbot)
 - Sees **only the signed-in user's own** groups, requests and documents.
@@ -295,7 +302,7 @@ Each step is something we build together, review, then commit.
 | | 11 | Settlement **(real payments: pay outside, send proof, requester approves)** |
 | 4. Documents | 12 | Document requests and uploads **(built; live test pending)** |
 | | 13 | AI receipt tools inside requests: scan and split, AI check on uploads |
-| 5. Dashboard | 14 | Dashboard: owe/owed/overdue and progress bars |
+| 5. Dashboard | 14 | Dashboard: owe/owed, documents to review, settled progress, attention and activity **(built)** |
 | 6. AI | 15 | Document Drafting: Fill Out a Form and Build a Spreadsheet **(built; live test pending)** |
 | | 16 | CommonTab Agent: questions and answers **(done early: groups, chats, contacts, reading receipts; payment and document answers come as those steps land)** |
 | | 17 | Agent reminders (scheduled job) |
@@ -318,7 +325,7 @@ Known gaps from Steps 6 and 7:
 - Limits: 30 questions per person in any 24 hours, every call logged in `ai_calls` (including which model answered).
 - When requests exist, give the AI read-only tools for them (what you owe, who still owes, due dates) and use the answer cards in `src/app/(app)/ai/blocks.tsx` (payment summary, document request).
 
-**Dashboard** matches the Group page: real groups (unread counts, "@ You"), Recent activity (chats with new messages) and Needs your attention (mentions). The money cards (You owe, You're owed, Overdue, Settled) are still $0 placeholders; they get real numbers in Step 14.
+**Dashboard** (Step 14, built 2026-11-10): all live; see section 8.
 
 **Done: Steps 9 to 11, payment requests, disputes and simulated payments** (2026-11-10; migrations `20261110110000` to `20261110170000` have all been run; all live). See sections 4 and 5 for how they work. Code:
 - `src/app/(app)/group/requests.ts`: types and the plain-code money helpers (`splitEvenly`, `splitByPercent`, `parseCents`, `dueLabel`, the page links, `SHARE_STATUS`).
@@ -334,7 +341,9 @@ Tested with @briantest: a full negotiation (propose, decline, counter, accept), 
 
 **Done since:** owner can cancel document requests (an × on the card and page), shared **AI Verified** results with `AI_VERIFY_SECRET`, and accepted documents kept in each chat's **Files** tab (migrations `20261110230000` to `20261110250000` have all been run; all live).
 
-**Now: the payment flow again** (started 2026-11-10): real payments with proof replaced the simulation (see section 5). Still to test with @briantest: paying with each method, sending proof, approving and rejecting, and resubmitting.
+**Now: the Dashboard** (Step 14, 2026-11-10): real You owe, You're owed, Documents to review, Settled across groups, Needs your attention and Recent activity (section 8).
+
+**Built: the payment flow again** (2026-11-10): real payments with proof replaced the simulation (see section 5). Still to test with @briantest: paying with each method, sending proof, approving and rejecting, and resubmitting.
 
 **Built: Step 15, Document Drafting** (2026-11-10; migration `20261110260000_document_drafting.sql`). See section 7. Still to test with real forms and chats: a fillable PDF, a Word form, a photo of a form, and a spreadsheet from a chat with payment requests and receipts.
 
